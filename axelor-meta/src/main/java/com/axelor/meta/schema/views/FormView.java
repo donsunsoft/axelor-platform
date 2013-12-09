@@ -44,6 +44,9 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 public class FormView extends AbstractView {
 
 	@XmlAttribute
+	private String css;
+
+	@XmlAttribute
 	private Integer cols;
 
 	@XmlAttribute
@@ -51,15 +54,18 @@ public class FormView extends AbstractView {
 
 	@XmlAttribute
 	private String onLoad;
-	
+
 	@XmlAttribute
 	private String onSave;
-	
+
 	@XmlAttribute
 	private String onNew;
-	
+
 	@XmlAttribute
 	private String helpLink;
+
+	@XmlAttribute
+	private String readonlyIf;
 
 	@XmlElements({
 		@XmlElement(name = "include", type = FormInclude.class),
@@ -74,55 +80,71 @@ public class FormView extends AbstractView {
         @XmlElement(name = "button", type = Button.class)
 	})
 	private List<AbstractWidget> items;
-	
+
+	public String getCss() {
+		return css;
+	}
+
+	public void setCss(String css) {
+		this.css = css;
+	}
+
 	public Integer getCols() {
 		return cols;
 	}
-	
+
 	public void setCols(Integer cols) {
 		this.cols = cols;
 	}
-	
+
 	public String getColWidths() {
 		return colWidths;
 	}
-	
+
 	public void setColWidths(String colWidths) {
 		this.colWidths = colWidths;
 	}
-	
+
 	public String getOnLoad() {
 		return onLoad;
 	}
-	
+
 	public void setOnLoad(String onLoad) {
 		this.onLoad = onLoad;
 	}
-	
+
 	public String getOnSave() {
 		return onSave;
 	}
-	
+
 	public void setOnSave(String onSave) {
 		this.onSave = onSave;
 	}
-	
+
 	public String getOnNew() {
 		return onNew;
 	}
-	
+
 	public void setOnNew(String onNew) {
 		this.onNew = onNew;
 	}
-	
+
 	public String getHelpLink() {
 		return helpLink;
 	}
-	
+
 	public void setHelpLink(String helpLink) {
 		this.helpLink = helpLink;
 	}
-	
+
+	public String getReadonlyIf() {
+		return readonlyIf;
+	}
+
+	public void setReadonlyIf(String readonlyIf) {
+		this.readonlyIf = readonlyIf;
+	}
+
 	public List<AbstractWidget> getItems() {
 		if(items != null) {
 			for (AbstractWidget abstractWidget : items) {
@@ -136,7 +158,7 @@ public class FormView extends AbstractView {
 		}
 		return items;
 	}
-	
+
 	public void setItems(List<AbstractWidget> items) {
 		this.items = items;
 	}

@@ -135,7 +135,7 @@
         <xsd:complexType>
           <xsd:sequence>
             <xsd:choice maxOccurs="unbounded">
-              <xsd:element name="item" maxOccurs="unbounded">
+              <xsd:element name="item">
                 <xsd:complexType>
                   <xsd:attribute name="title" type="xsd:string" use="required"/>
                   <xsd:attribute name="action" type="xsd:string" use="required"/>
@@ -144,7 +144,12 @@
                   <xsd:attribute name="readonlyIf" type="xsd:string"/>
                 </xsd:complexType>
               </xsd:element>
-              <xsd:element name="divider" minOccurs="0" maxOccurs="unbounded"/>
+              <xsd:element name="divider">
+                <xsd:complexType>
+                  <xsd:attribute name="showIf" type="xsd:string"/>
+                  <xsd:attribute name="hideIf" type="xsd:string"/>
+                </xsd:complexType>
+              </xsd:element>
             </xsd:choice>
           </xsd:sequence>
           <xsd:attribute name="title" type="xsd:string" use="required"/>
@@ -163,8 +168,30 @@
         </xsd:documentation>
       </xsd:annotation>
     </xsd:attribute>
+    <xsd:attribute name="width">
+      <xsd:annotation>
+        <xsd:documentation>
+        The preferred width of the view.&lt;br&gt;&lt;br&gt;
+      
+        The width can be specified as percentage or fixed value followed by
+        optional min/max widths separated by ':' character.&lt;br&gt;&lt;br&gt;
+        
+        For example: &lt;br&gt;&lt;pre&gt;
+          width="720"
+          width="80%"
+          width="80%:600:700"&lt;/pre&gt;
+          
+        The fix width can be either in 'px' or 'em', 'px' is assumed if not specified.
+        </xsd:documentation>
+      </xsd:annotation>
+      <xsd:simpleType>
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="((\*)|(\d+)(%|px|em)?)((:(\d+)(px|em)?){1,2})?"></xsd:pattern>
+        </xsd:restriction>
+      </xsd:simpleType>
+    </xsd:attribute>
   </xsd:complexType>
-  
+
   <xsd:complexType name="ObjectView" abstract="true">
     <xsd:complexContent>
       <xsd:extension base="tns:AbstractView">
@@ -213,6 +240,13 @@
         <xsd:attribute name="readonly" type="xsd:boolean" />
         <xsd:attribute name="colSpan" type="xsd:int" />
         <xsd:attribute name="css" type="xsd:string"/>
+        <xsd:attribute name="width">
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+              <xsd:pattern value="(\*)|(\d+(%|px|em)?)"></xsd:pattern>
+            </xsd:restriction>
+          </xsd:simpleType>
+        </xsd:attribute>
         <xsd:attribute name="showIf" type="xsd:string">
           <xsd:annotation>
             <xsd:documentation>
@@ -322,7 +356,7 @@
         <xsd:sequence>
           <xsd:element name="toolbar" type="tns:Toolbar" minOccurs="0"/>
           <xsd:element name="menubar" type="tns:Menubar" minOccurs="0"/>
-          <xsd:element name="hilite" type="tns:Hilite" minOccurs="0" maxOccurs="1" />
+          <xsd:element name="hilite" type="tns:Hilite" minOccurs="0" maxOccurs="unbounded" />
           <xsd:element name="field" type="tns:GridField" maxOccurs="unbounded" />
           <xsd:element name="button" type="tns:Button" minOccurs="0" maxOccurs="unbounded"/>
         </xsd:sequence>
@@ -365,12 +399,14 @@
             <xsd:group ref="tns:FormWidgets" />
           </xsd:choice>
         </xsd:sequence>
+        <xsd:attribute name="css" type="xsd:string"/>
         <xsd:attribute name="cols" type="xsd:int" />
         <xsd:attribute name="colWidths" type="xsd:string" />
         <xsd:attribute name="onLoad" type="xsd:string" />
         <xsd:attribute name="onSave" type="xsd:string" />
         <xsd:attribute name="onNew" type="xsd:string" />
         <xsd:attribute name="helpLink" type="xsd:string" />
+        <xsd:attribute name="readonlyIf" type="xsd:string" />
       </xsd:extension>
     </xsd:complexContent>
   </xsd:complexType>
@@ -518,6 +554,13 @@
               <xsd:maxInclusive value="24"/>
             </xsd:restriction>
           </xsd:simpleType>
+        </xsd:attribute>
+        <xsd:attribute name="onChange" type="xsd:string">
+          <xsd:annotation>
+            <xsd:documentation>
+            The onchange action is called when event is moved or resized in the calendar view.
+            </xsd:documentation>
+          </xsd:annotation>
         </xsd:attribute>
         <xsd:attribute name="colorBy" type="xsd:string">
           <xsd:annotation>
@@ -961,8 +1004,8 @@
   <xsd:complexType name="Field">
     <xsd:complexContent>
       <xsd:extension base="tns:SimpleWidget">
-        <xsd:all>
-          <xsd:element name="hilite" type="tns:Hilite" minOccurs="0" >
+        <xsd:sequence>
+          <xsd:element name="hilite" type="tns:Hilite" minOccurs="0" maxOccurs="unbounded">
             <xsd:annotation>
               <xsd:documentation>
                 Hilite the field with given color/background-color combination.
@@ -971,7 +1014,7 @@
           </xsd:element>
           <xsd:element name="grid" type="tns:GridView" minOccurs="0" />
           <xsd:element name="form" type="tns:FormView" minOccurs="0" />
-        </xsd:all>
+        </xsd:sequence>
         <xsd:attribute name="name" type="xsd:string" use="required" />
         <xsd:attribute name="placeholder" type="xsd:string" />
         <xsd:attribute name="widget" type="xsd:string" />
@@ -1142,7 +1185,6 @@
   <xsd:complexType name="GridField">
     <xsd:complexContent>
       <xsd:extension base="tns:Field">
-        <xsd:attribute name="width" type="xsd:integer"/>
         <xsd:attribute name="aggregate">
           <xsd:simpleType>
             <xsd:restriction base="xsd:string">
@@ -1202,7 +1244,16 @@
   <xsd:complexType name="ActMessage">
     <xsd:complexContent>
       <xsd:extension base="tns:AbstractAct">
-        <xsd:attribute name="message" type="xsd:string" use="required"/>
+        <xsd:attribute name="message" type="xsd:string" use="required">
+          <xsd:annotation>
+            <xsd:documentation>The message to show.</xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+        <xsd:attribute name="action" type="xsd:string">
+          <xsd:annotation>
+            <xsd:documentation>An action-record to be executed on confimation.</xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
       </xsd:extension>
     </xsd:complexContent>
   </xsd:complexType>

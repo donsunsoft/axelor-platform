@@ -57,6 +57,10 @@
 			this._lastDomain = null;
 			this._lastContext = null;
 			this._showArchived = opts.archived;
+			
+			if (opts.archived === undefined && _.has(opts.params || {}, 'showArchived')) {
+				this._showArchived = opts.params.showArchived;
+			}
 
 			this._data = [];
 
@@ -444,9 +448,7 @@
 						} else {
 							deferred.reject(response);
 						}
-						setTimeout(function(){
-							$rootScope.$apply();
-						});
+						$rootScope.applyLater();
 					}
 				};
 

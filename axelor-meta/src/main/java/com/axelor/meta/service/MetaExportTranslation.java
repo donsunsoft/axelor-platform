@@ -37,7 +37,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -104,12 +103,12 @@ import com.axelor.meta.schema.views.SimpleContainer;
 import com.axelor.meta.schema.views.SimpleWidget;
 import com.axelor.meta.schema.views.TreeView;
 import com.axelor.meta.schema.views.TreeView.TreeColumn;
+import com.google.common.base.CaseFormat;
 import com.google.common.base.Charsets;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.common.io.Files;
 import com.google.common.io.Resources;
 
@@ -147,7 +146,7 @@ public class MetaExportTranslation {
 	private String currentModule ;
 
 	private List<String> internalFields = Lists.newArrayList("createdOn", "updatedOn", "createdBy", "updatedBy", "id", "version", "archived");
-	Map<String, List<String>> doc = Maps.newHashMap();
+	Map<String, Map<String, String>> doc = Maps.newLinkedHashMap();
 
 	public void exportTranslations(String exportPath, String exportLanguage) throws Exception {
 
@@ -155,8 +154,9 @@ public class MetaExportTranslation {
 		this.exportLanguage = exportLanguage;
 
 		List<MetaModule> modules = MetaModule.all().filter("self.installed = true").fetch();
-		Set<String> set = Sets.newHashSet();
-		this.loadViewFromEntry(set, "");
+		List<String> viewList = Lists.newArrayList();
+		List<String> menuList = Lists.newArrayList();
+		this.loadViewFromEntry(viewList, menuList, "");
 
 		//axelor-core
 		MetaModule coreModule = new MetaModule();
@@ -182,7 +182,7 @@ public class MetaExportTranslation {
 			this.exportViews();
 			this.exportActions();
 			this.exportOther();
-			this.exportDoc(set);
+			this.exportDoc(viewList, menuList);
 		}
 	}
 
@@ -259,21 +259,23 @@ public class MetaExportTranslation {
 
 	private void exportViews() {
 		for (MetaView view : MetaView.findByModule(this.currentModule).order("name").order("type").fetch()) {
-			AbstractView abstractView = this.fromXML(view.getXml());
+			AbstractView abstractView = this.fromXML(view);
 			if(abstractView != null) {
 				this.loadView(abstractView);
 			}
 		}
 	}
 
-	private AbstractView fromXML(String xml) {
+	private AbstractView fromXML(MetaView view) {
 		try {
-			ObjectViews views = (ObjectViews) metaLoader.fromXML(xml);
+			ObjectViews views = (ObjectViews) metaLoader.fromXML(view.getXml());
 			if (views != null && views.getViews() != null)
 					return views.getViews().get(0);
 		}
 		catch(Exception ex) {
-			log.error("Exception : {}", ex);
+			log.error("Error while exporting {}.", view.getName());
+			log.error("Unable to export data.");
+			log.error("With following exception:", ex);
 		}
 		return null;
 	}
@@ -535,8 +537,9 @@ public class MetaExportTranslation {
 			}
 		}
 		catch(Exception ex) {
-			log.error("Error while exporting file : {}", file.getName());
-			log.error("With following exception : {}", ex);
+			log.error("Error while exporting {}.", file.getName());
+			log.error("Unable to export data.");
+			log.error("With following exception:", ex);
 		}
 	}
 
@@ -566,15 +569,22 @@ public class MetaExportTranslation {
 		}
 	}
 
-	private void exportDoc(Set<String> set) {
+	private void exportDoc(List<String> viewList, List<String> menuList) {
+		Class<?> klass = ActionView.class;
+		for (String name : menuList) {
+			MetaAction action = MetaAction.all().filter("self.name = ?1 AND self.module = ?2 AND self.type = ?3", name, currentModule, CaseFormat.UPPER_CAMEL.to(CaseFormat.LOWER_HYPHEN, klass.getSimpleName())).fetchOne();
+			if(action != null) {
+				this.sendToDoc(name, name, "");
+			}
+		}
 
-		for (String name : Lists.newArrayList(set)) {
+		for (String name : viewList) {
 			try {
 				MetaView view = MetaView.all().filter("self.name = ?1 AND self.module = ?2", name, currentModule).fetchOne();
 				if(view != null) {
-					AbstractView abstractView = this.fromXML(view.getXml());
+					AbstractView abstractView = this.fromXML(view);
 					if(abstractView != null) {
-						this.viewToDoc(abstractView);
+						this.viewToDoc(abstractView, abstractView.getName(), 1);
 					}
 				}
 			}
@@ -586,43 +596,43 @@ public class MetaExportTranslation {
 		this.loadDoc();
 	}
 
-	private void viewToDoc(AbstractView abstractView) {
-		this.abstractViewToDoc(abstractView);
-		this.viewToDoc(abstractView, 1);
-	}
-
 	private void abstractViewToDoc(AbstractView abstractView) {
 		if(abstractView.getToolbar() != null) {
 			for (Button button : abstractView.getToolbar()) {
-				this.sendToDoc(abstractView.getName(), button.getName());
+				this.sendToDoc(abstractView.getName(), button.getName(), button.getDefaultHelp());
 			}
 		}
 		if(abstractView.getMenubar() != null) {
 			for (Menu menu : abstractView.getMenubar()) {
 				if(menu.getItems() != null) {
 					for (Item item : menu.getItems()) {
-						this.sendToDoc(abstractView.getName(), item.getName());
+						this.sendToDoc(abstractView.getName(), item.getName(), "");
 					}
 				}
 			}
 		}
-		//TODO : Export Documentation for form view.
 	}
 
-	private void viewToDoc(AbstractView abstractView, int level) {
+	private void viewToDoc(AbstractView abstractView, String viewName, int level) {
+
+		this.sendToDoc(abstractView.getName(), viewName, "");
+
+		if(level == 1) {
+			this.abstractViewToDoc(abstractView);
+		}
 
 		if(abstractView instanceof FormView) {
 			for (AbstractWidget widget : ((FormView) abstractView).getItems()) {
-				this.widgetToDoc(abstractView, widget, level) ;
+				this.widgetToDoc(viewName, widget, level) ;
 			}
 		}
 	}
 
-	private void containerToDoc(AbstractView abstractView, AbstractContainer container, int level) {
+	private void containerToDoc(String viewName, AbstractContainer container, int level) {
 		if(container instanceof Notebook) {
 			if(((Notebook)container).getPages() != null) {
 				for (Page page : ((Notebook)container).getPages()) {
-					this.widgetToDoc(abstractView, (AbstractWidget) page, level) ;
+					this.widgetToDoc(viewName, (AbstractWidget) page, level) ;
 				}
 			}
 		}
@@ -630,38 +640,38 @@ public class MetaExportTranslation {
 			SimpleContainer simpleContainer = (SimpleContainer) container;
 			if(simpleContainer.getItems() != null) {
 				for (AbstractWidget widget : simpleContainer.getItems()) {
-					this.widgetToDoc(abstractView, widget, level);
+					this.widgetToDoc(viewName, widget, level);
 				}
 			}
 		}
 	}
 
-	private void widgetToDoc(AbstractView abstractView, AbstractWidget widget, int level) {
+	private void widgetToDoc(String viewName, AbstractWidget widget, int level) {
 		if(widget instanceof AbstractContainer) {
 			AbstractContainer container = (AbstractContainer) widget;
-			this.containerToDoc(abstractView, container, level);
+			this.containerToDoc(viewName, container, level);
 		}
 		else if(widget instanceof Button) {
-			this.sendToDoc(abstractView.getName(), ( (Button) widget).getName());
+			this.sendToDoc(viewName, ( (Button) widget).getName(), ( (Button) widget).getDefaultHelp());
 		}
 		else if(widget instanceof Field) {
 			Field field = (Field) widget;
 			if(!field.getExport()) {
 				return;
 			}
-			this.sendToDoc(abstractView.getName(), field.getName());
+			this.sendToDoc(viewName, field.getName(), field.getDefaultHelp());
 			if(field.getDocumentation() && level == 1) {
 				if(field.getViews() != null) {
 					for (AbstractView subAbstractView : field.getViews()) {
-						this.viewToDoc(subAbstractView, level+1);
+						this.viewToDoc(subAbstractView, viewName, level+1);
 					}
 				}
 				else if(field.getFormView() != null) {
 					MetaView view = MetaView.all().filter("self.name = ?1 AND self.module = ?2", field.getFormView(), currentModule).fetchOne();
 					if(view != null) {
-						AbstractView subAbstractView = this.fromXML(view.getXml());
+						AbstractView subAbstractView = this.fromXML(view);
 						if(subAbstractView != null) {
-							this.viewToDoc(subAbstractView, level+1);
+							this.viewToDoc(subAbstractView, subAbstractView.getName(), level+1);
 						}
 					}
 				}
@@ -669,9 +679,9 @@ public class MetaExportTranslation {
 					String name = this.findView(field.getTarget(), "form");
 					MetaView view = MetaView.all().filter("self.name = ?1 AND self.module = ?2", name, currentModule).fetchOne();
 					if(view != null) {
-						AbstractView subAbstractView = this.fromXML(view.getXml());
+						AbstractView subAbstractView = this.fromXML(view);
 						if(subAbstractView != null) {
-							this.viewToDoc(subAbstractView, level+1);
+							this.viewToDoc(subAbstractView, subAbstractView.getName(), level+1);
 						}
 					}
 				}
@@ -679,26 +689,39 @@ public class MetaExportTranslation {
 		}
 	}
 
-	private void sendToDoc(String key, String value) {
+	private void sendToDoc(String key, String value, String help) {
+		if(Strings.isNullOrEmpty(key) || Strings.isNullOrEmpty(value)) {
+			return;
+		}
+
 		if(!doc.containsKey(key)) {
-			List<String> values = Lists.newArrayList();
-			values.add(value);
-			doc.put(key, values);
+			Map<String, String> map = Maps.newLinkedHashMap();
+			map.put(value, help);
+			doc.put(key, map);
 		}
 		else {
-			List<String> values = doc.get(key);
-			if(!values.contains(value)) {
-				values.add(value);
+			Map<String, String> map = doc.get(key);
+			if(!map.containsKey(value)) {
+				map.put(value, help);
 			}
 		}
 	}
 
+	@SuppressWarnings("rawtypes")
 	private void loadDoc() {
 		for (String key : doc.keySet()) {
-			for (String value : doc.get(key)) {
-				String translation = this.getTranslation(value, "", key, this.docType);
-				this.appendToFile(key, value, this.docType, "", translation);
+			Map<String, String> values = doc.get(key);
+			for (String value : values.keySet()) {
+				String translation = JPA.translate(value, "", key, this.docType);
+				String docTranslation = this.getTranslation(value, "", key, this.docType);
+				List<Map> list = MetaView.all().filter("self.name = ?1 AND self.module = ?2", key, currentModule).select("model").fetch(1, 0);
+				String helpTranslation = "";
+				if(list != null && !list.isEmpty()) {
+					helpTranslation = this.getTranslation(value, "", list.get(0).get("model").toString(), this.helpType);
+				}
+				this.appendToFile(key, value, this.docType, translation, docTranslation, values.get(value), helpTranslation);
 			}
+
 		}
 		doc.clear();
 	}
@@ -803,20 +826,20 @@ public class MetaExportTranslation {
 		}
 	}
 
-	public void loadViewFromEntry(Set<String> set, String parent) {
+	public void loadViewFromEntry(List<String> viewList, List<String> menuList, String parent) {
 		List<MetaMenu> menu = this.getMenus(parent);
 
 		for (MetaMenu item : menu) {
 			if(item.getAction() != null) {
-				this.addView(set, item);
+				this.addView(viewList, menuList, item);
 			}
 			else {
-				this.loadViewFromEntry(set, item.getName());
+				this.loadViewFromEntry(viewList, menuList, item.getName());
 			}
 		}
 	}
 
-	private void addView(Set<String> list, MetaMenu item) {
+	private void addView(List<String> viewList, List<String> menuList, MetaMenu item) {
 		MetaAction metaAction = item.getAction();
 		ObjectViews views;
 
@@ -827,30 +850,37 @@ public class MetaExportTranslation {
 		}
 
 		if(views.getActions() != null && views.getActions().size() > 0) {
-			this.addView(list, views.getActions().get(0));
+			this.addView(viewList, menuList, views.getActions().get(0));
 		}
 	}
 
-	private void addView(Set<String> set, Action action) {
+	private void addView(List<String> viewList, List<String> menuList, Action action) {
 		if(action instanceof ActionView) {
-			this.addView(set, (ActionView) action);
+			ActionView actionView = (ActionView) action;
+			if(!menuList.contains(actionView.getName())) {
+				menuList.add(actionView.getName());
+			}
+			this.addView(viewList, actionView);
 		}
 	}
 
-	private void addView(Set<String> set, ActionView action) {
+	private void addView(List<String> viewList, ActionView action) {
 		if(action.getViews() == null) {
 			return ;
 		}
 		for (View view : action.getViews()) {
-			if(!"form".equals(view.getType()) && !"grid".equals(view.getType())) {
+			if(!"form".equals(view.getType())) {
 				continue;
 			}
 
-			if(!Strings.isNullOrEmpty(view.getName())) {
-				set.add(view.getName());
-				continue;
+			String viewName = view.getName();
+			if(Strings.isNullOrEmpty(viewName)) {
+				viewName = this.findView(action.getModel(), view.getType());
 			}
-			set.add(this.findView(action.getModel(), view.getType()));
+			if(!viewList.contains(viewName)) {
+				viewList.add(viewName);
+			}
+			break;
 		}
 	}
 
@@ -872,6 +902,6 @@ public class MetaExportTranslation {
 			filter += "self.parent.name = '" + parent+"'";
 		}
 
-		return JPA.all(MetaMenu.class).filter(filter).fetch();
+		return JPA.all(MetaMenu.class).filter(filter).order("-priority").order("id").fetch();
 	}
 }

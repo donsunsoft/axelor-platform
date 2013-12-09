@@ -30,6 +30,7 @@
  */
 package com.axelor.web.service;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -53,11 +54,20 @@ import com.axelor.db.mapper.Mapper;
 import com.axelor.db.mapper.Property;
 import com.axelor.meta.db.MetaSelect;
 import com.axelor.meta.db.MetaSelectItem;
+import com.axelor.meta.schema.views.AbstractView;
+import com.axelor.meta.schema.views.AbstractWidget;
+import com.axelor.meta.schema.views.Field;
+import com.axelor.meta.schema.views.FormInclude;
+import com.axelor.meta.schema.views.FormView;
+import com.axelor.meta.schema.views.GridView;
+import com.axelor.meta.schema.views.Notebook;
+import com.axelor.meta.schema.views.SimpleContainer;
 import com.axelor.meta.service.MetaService;
 import com.axelor.rpc.Request;
 import com.axelor.rpc.Resource;
 import com.axelor.rpc.Response;
 import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -84,17 +94,65 @@ public class ViewService extends AbstractService {
 	@GET
 	@Path("models")
 	public Response models() {
-		return Resource.models(new Request());
+
+		final List<Permission> permissions = this.getPermissions(null);
+		final Response response = new Response();
+		if (permissions == null) {
+			return Resource.models(new Request());
+		}
+
+		final List<String> all = Lists.newArrayList();
+		final User user = AuthUtils.getUser();
+		if (user.getGroup().getRestricted() == Boolean.TRUE) {
+			for (Permission p : permissions) {
+				if (p.getObject() == null || (p.getCanRead() != Boolean.TRUE && p.getReadCondition() == null)) {
+					continue;
+				}
+				all.add(p.getObject());
+			}
+		} else {
+			final List<String> exclude = Lists.newArrayList();
+			for (Permission p : permissions) {
+				if (p.getObject() == null || (p.getCanRead() != Boolean.TRUE && p.getReadCondition() == null)) {
+					exclude.add(p.getObject());
+				}
+			}
+			for (Class<?> cls : JPA.models()) {
+				if (exclude.indexOf(cls.getName()) == -1) {
+					all.add(cls.getName());
+				}
+			}
+		}
+
+		Collections.sort(all);
+
+		response.setData(all);
+		response.setTotal(all.size());
+		response.setStatus(Response.STATUS_SUCCESS);
+		return response;
 	}
 
 	@GET
 	@Path("fields/{model}")
 	public Response fields(@PathParam("model") String model) {
-
 		final Response response = new Response();
 		final Map<String, Object> meta = Maps.newHashMap();
 		final Class<?> modelClass = findClass(model);
 		final List<Object> fields = Lists.newArrayList();
+		final List<Permission> permissions = this.getPermissions(model);
+
+		if (permissions != null) {
+			final User user = AuthUtils.getUser();
+			final Permission perm = permissions.isEmpty() ? null : permissions.get(0);
+			if (perm == null && user.getGroup().getRestricted() == Boolean.TRUE) {
+				response.setStatus(Response.STATUS_FAILURE);
+				return response;
+			}
+			if (perm != null && perm.getCanRead() != Boolean.TRUE && perm.getReadCondition() == null) {
+				response.setStatus(Response.STATUS_FAILURE);
+				return response;
+			}
+		}
 
 		for (Property p : Mapper.of(modelClass).getProperties()) {
 			Map<String, Object> map = p.toMap();
@@ -102,7 +160,7 @@ public class ViewService extends AbstractService {
 			if (title == null) {
 				title = p.getName();
 			}
-			title = JPA.translate(title, p.getTitle(), modelClass.getName(), "field");
+			title = JPA.translate(p.getName(), p.getTitle(), modelClass.getName(), "field");
 			map.put("title", title);
 			fields.add(map);
 		}
@@ -127,27 +185,17 @@ public class ViewService extends AbstractService {
 		return service.findViews(findClass(model), views);
 	}
 
-	@GET
-	@Path("view")
-	public Response view(
-			@QueryParam("model") String model,
-			@QueryParam("name") String name,
-			@QueryParam("type") String type) {
-		return service.findView(model, name, type);
-	}
+	private Map<String, Object> findFields(final String model, final List<String> names) {
+		final Map<String, Object> data = Maps.newHashMap();
 
-	@POST
-	@Path("view/fields")
-	public Response viewFields(Request request) {
-
-		final String model = request.getModel();
-		final List<String> names = request.getFields();
+		if (Strings.isNullOrEmpty(model)) {
+			return data;
+		}
 
 		final Class<?> modelClass = findClass(model);
 		final Mapper mapper = Mapper.of(modelClass);
-
-		final Response response = new Response();
 		final List<Object> fields = Lists.newArrayList();
+
 
 		for(String name : names) {
 			Property p = findField(mapper, name);
@@ -164,12 +212,78 @@ public class ViewService extends AbstractService {
 			}
 		}
 
-		Map<String, Object> data = Maps.newHashMap();
 		data.put("perms", perms(modelClass));
 		data.put("fields", fields);
 
-		response.setData(data);
+		return data;
+	}
 
+	private List<String> findNames(final List<String> names, final AbstractWidget widget) {
+		List<? extends AbstractWidget> all = null;
+		if (widget instanceof Notebook) {
+			all = ((Notebook) widget).getPages();
+		} else if (widget instanceof SimpleContainer) {
+			all = ((SimpleContainer) widget).getItems();
+		} else if (widget instanceof FormInclude) {
+			names.addAll(findNames(((FormInclude) widget).getView()));
+		} else if (widget instanceof Field) {
+			names.add(((Field) widget).getName());
+		}
+		if (all == null) {
+			return names;
+		}
+		for (AbstractWidget item : all) {
+			findNames(names, item);
+		}
+		return names;
+	}
+
+	public List<String> findNames(final AbstractView view) {
+		List<String> names = Lists.newArrayList();
+		List<AbstractWidget> items = null;
+		if (view instanceof FormView) {
+			items = ((FormView) view).getItems();
+		}
+		if (view instanceof GridView) {
+			items = ((GridView) view).getItems();
+		}
+		if (items == null || items.isEmpty()) {
+			return names;
+		}
+		for (AbstractWidget widget : items) {
+			findNames(names, widget);
+		}
+		return names;
+	}
+
+	@GET
+	@Path("view")
+	public Response view(
+			@QueryParam("model") String model,
+			@QueryParam("name") String name,
+			@QueryParam("type") String type) {
+
+		final Response response = service.findView(model, name, type);
+		final AbstractView view = (AbstractView) response.getData();
+
+		final Map<String, Object> data = Maps.newHashMap();
+		data.put("view", view);
+
+		if (view instanceof AbstractView) {
+			data.putAll(findFields(model, findNames((AbstractView) view)));
+		}
+
+		response.setData(data);
+		response.setStatus(Response.STATUS_SUCCESS);
+
+		return response;
+	}
+
+	@POST
+	@Path("view/fields")
+	public Response viewFields(Request request) {
+		final Response response = new Response();
+		response.setData(findFields(request.getModel(), request.getFields()));
 		return response;
 	}
 
@@ -203,8 +317,38 @@ public class ViewService extends AbstractService {
 		map.put("write", p.getCanWrite());
 		map.put("create", p.getCanCreate());
 		map.put("remove", p.getCanRemove());
+		map.put("export", p.getCanExport());
 
 		return map;
+	}
+
+	private List<Permission> getPermissions(String model) {
+		final User user = AuthUtils.getUser();
+		if (user == null || user.getGroup() == null
+				|| "admin".equals(user.getCode())
+				|| "admins".equals(user.getGroup().getCode())) {
+			return null;
+		}
+
+		String s = "SELECT p FROM User u " +
+				"LEFT JOIN u.group AS g " +
+				"LEFT JOIN g.permissions AS p " +
+				"WHERE u.code = :code";
+
+		if (model == null) {
+			s += " AND p.object IS NOT NULL";
+		} else {
+			s += " AND p.object = :obj";
+		}
+
+		TypedQuery<Permission> q = JPA.em().createQuery(s, Permission.class);
+
+		q.setParameter("code", user.getCode());
+		if (model != null) {
+			q.setParameter("obj", model);
+		}
+
+		return q.getResultList();
 	}
 
 	private Property findField(final Mapper mapper, String name) {

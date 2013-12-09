@@ -36,7 +36,7 @@
 
 .view-container .form-view > div:last-child {
 	position: absolute;
-	top: 48px;
+	top: 46px;
 	bottom: 0; left: 0; right: 0;
 	overflow: auto;
 }
@@ -45,8 +45,34 @@
 	top: 0;
 }
 
+.view-container .form-view > div[ui-view-form].has-width {
+	padding: 8px 16px;
+	background-color: #f7f7f9;
+}
+
+.view-container .form-view > div[ui-view-form].has-width > form {
+	padding: 8px;
+	background-color: #fff;
+	
+	border: 1px solid rgba(0, 0, 0, 0.2);
+	border-radius: 4px;
+	box-shadow: 1px 1px 6px rgba(0, 0, 0, 0.2);
+	
+	width: 90%;
+	min-width: 600px;
+	overflow: auto;
+}
+
+.view-container .form-view .nested-editor form {
+	width: inherit !important;
+}
+
+.ui-dialog-content > div[ui-view-form] {
+	min-width: 320px;
+}
+
 form.dynamic-form {
-	margin: 0;
+	margin: 4px auto;
 }
 
 table.form-layout {
@@ -74,8 +100,11 @@ table.form-layout td.form-item {
 }
 
 table.form-layout td.form-label {
-	text-align: right;
+	text-align: left;
+	padding-left: 8px;
+	padding-right: 4px;
 	width: 15%;
+	min-width: 100px;
 }
 
 table.form-layout td.form-item.boolean-item {
@@ -93,17 +122,12 @@ table.form-layout td.form-label > label > span {
 	cursor: pointer;
 }
 
-table.form-layout td.form-label > label:after {
-	content: ":";
-}
-
 table.form-layout td.form-label label.required {
 	color: #B94A48;
 }
 
 table.form-layout td.form-label label.readonly {
 	color: inherit;
-	padding-left: 16px;
 }
 
 table.form-layout td.form-item > *,
@@ -122,15 +146,23 @@ table.form-layout td.form-item.v-align-top {
 	display: block;
 }
 
+.form-item-container {
+	min-width: 26px;
+}
+
 .form-item-container > span.display-text {
 	padding-top: 4px;
 	padding-bottom: 2px;
 }
 
 .form-item-container input {
-	min-width: 170px;
 	height: 26px;
 	padding: 2px 6px;
+	min-width: 170px;
+}
+
+.form-item-container[style *= width] input {
+	min-width: inherit;
 }
 
 .form-item-container input,
@@ -152,6 +184,18 @@ table.form-layout td.form-item.v-align-top {
 	min-width: inherit;
 	height: inherit;
 	margin-top: 6px !important;
+}
+
+.form-item-container label.checkbox {
+	padding-right: 6px;
+}
+
+.form-item-container.readonly label.checkbox {
+	cursor: default;
+}
+
+.form-item-container label.checkbox input[type="checkbox"] {
+	margin-top: 4px !important;
 }
 
 .form-item-container button {
@@ -180,6 +224,14 @@ table.form-layout fieldset {
 .form-item-container.readonly > a {
 	line-height: 24px;
 	color: #0088cc;
+}
+
+.form-item-container.datetime input {
+	min-width: 100px;
+}
+
+.form-item-container.datetime-item input {
+	min-width: 134px;
 }
 
 .form-item-container > input.display-text {
@@ -261,6 +313,10 @@ table.form-layout td.form-item .stackbar.inline-editable {
 	min-height: 200px;
 }
 
+table.form-layout td.form-item .stackbar.readonly .edit-icon i:before {
+	content: "\f044";
+}
+	
 .icons-bar {
 	display: inline-block;
 	padding-top: 4px;
@@ -486,22 +542,35 @@ table.field-details td {
 	white-space: nowrap;
 }
 
+table.field-details .help-text {
+	white-space: normal;
+}
+
 table.field-details .help-text hr {
 	margin: 9px 0;
 }
 
 .popover {
 	width: auto;
-	max-width: inherit;
+	max-width: 480px;
 	z-index: 2147483647;
 }
 
 .popover-inner {
 	width: inherit;
 	min-width: 280px;
-	max-width: 500px;
+	max-width: 480px;
 	display: table;
 	overflow: hidden;
+}
+
+.popover .field-details th {
+	vertical-align: top;
+}
+
+.popover .field-details code {
+	display: block;
+	white-space: pre-wrap;
 }
 
 .ws-nowrap {
@@ -519,6 +588,7 @@ table.field-details .help-text hr {
 }
 
 .subtotal label {
+	text-align: right;
 	font-weight: normal !important;	
 }
 
@@ -561,6 +631,7 @@ table.field-details .help-text hr {
 	display: inline-block;
 	padding-right: 35px;
 	height: 38px;
+	margin: 0;
 }
 
 .nav-select li {
@@ -575,6 +646,7 @@ table.field-details .help-text hr {
 	position: relative;
 	display: block;
 	float: left;
+	outline: none;
 }
 
 .nav-select li a:after,
@@ -738,6 +810,27 @@ table.field-details .help-text hr {
 	padding-left: 12px;
 }
 
+.image-select > img {
+	position: absolute;
+	top: 5px;
+	left: 8px;
+}
+
+.image-select.readonly > img {
+	position: initial;
+}
+
+.image-select input {
+	padding-left: 28px;
+}
+
+.empty > .image-select input {
+	padding-left: 8px;
+}
+
+.image-select-item img {
+	margin-right: 8px;
+}
 
 .multi-object-select {
 	
@@ -787,6 +880,11 @@ table.field-details .help-text hr {
 
 .button-item.button-icon {
 	text-decoration: none;
+}
+
+.button-item.disabled {
+	outline: none;
+	opacity: 0.55;
 }
 
 .record-toolbar .button-item {
@@ -874,6 +972,10 @@ table.field-details .help-text hr {
 .filter-menu input[type=radio],
 .filter-menu input[type=checkbox] {
 	margin-top: 3px;
+}
+
+.filter-menu .show-archived {
+	margin-left: 26px;
 }
 
 .btn-group > .btn-fix-left {

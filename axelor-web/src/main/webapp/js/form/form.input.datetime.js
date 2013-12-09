@@ -32,7 +32,7 @@
 
 var ui = angular.module('axelor.ui');
 
-// configure datepicket
+// configure datepicker
 if (_t.calendar) {
 	$.timepicker.setDefaults(_t.calendar);
 	$.datepicker.setDefaults(_t.calendar);
@@ -136,6 +136,13 @@ $.extend($.datepicker, {
 		}
 	}
 });
+
+var _updateDatepicker = $.datepicker._updateDatepicker;
+$.datepicker._updateDatepicker = function(inst) {
+	if (!$.datepicker._noUpdate) {
+		return _updateDatepicker.call($.datepicker, inst);
+	}
+};
 
 /**
  * The DateTime input widget.
@@ -264,9 +271,7 @@ ui.formInput('DateTime', {
 			}
 			
 			scope.setValue(value, true);
-			setTimeout(function(){
-				scope.$apply();
-			});
+			scope.applyLater();
 		}
 
 		scope.validate = function(value) {
@@ -302,7 +307,12 @@ ui.formInput('DateTime', {
 				var value = scope.getText();
 				if (value) {
 					input.mask('value', value);
-					input.datetimepicker('setDate', value);
+					try {
+						$.datepicker._noUpdate = true;
+						$.datepicker._setDateDatepicker(input[0], value);
+					} finally {
+						$.datepicker._noUpdate = false;
+					}
 				} else {
 					input.mask('value', '');
 				}
@@ -377,9 +387,7 @@ ui.formInput('Time', 'DateTime', {
 			}
 			
 			scope.setValue(value, true);
-			setTimeout(function(){
-				scope.$apply();
-			});
+			scope.applyLater();
 		}
 		
 		scope.$render_editable = function() {
@@ -408,6 +416,75 @@ ui.formInput('RelativeTime', 'DateTime', {
 				return moment(value).fromNow();
 			}
 			return "";
+		};
+	}
+});
+
+ui.formInput('Duration', 'Time', {
+	
+	mask: '99:mm',
+	
+	init: function(scope) {
+		this._super(scope);
+		
+		var field = scope.field;
+		var pattern = /^\d+:\d+(:\d+)?$/;
+
+		scope.format = function(value) {
+			if (!value || !_.isNumber(value)) {
+				return value;
+			}
+			
+			var h = Math.floor(value / 3600);
+			var m = Math.floor((value % 3600) / 60);
+			var s = Math.floor((value % 3600) % 60);
+			
+			h = _.str.pad(h, field.big ? 3 : 2, '0');
+			m = _.str.pad(m, 2, '0');
+			s = _.str.pad(s, 2, '0');
+
+			var text = h + ':' + m;
+			
+			if (field.seconds) {
+				text = text + ':' + s;
+			}
+			
+			return text;
+		};
+		
+		scope.parse = function(value) {
+			if (!value || !_.isString(value)) {
+				return value;
+			}
+			if (!pattern.test(value)) {
+				return null;
+			}
+			
+			var parts = value.split(':'),
+				first = +(parts[0]),
+				next = +(parts[1]),
+				last = +(parts[2] || 0);
+			
+			return (first * 60 * 60) + (next * 60) + last;
+		};
+	},
+	
+	link_editable: function(scope, element, attrs, model) {
+		var field = scope.field || {},
+			mask = this.mask;
+		
+		if (field.big) {
+			mask = "999:mm";
+		}
+		if (field.seconds) {
+			mask = mask + ":mm";
+		}
+		
+		this.mask = mask;
+		this._super.apply(this, arguments);
+		
+		scope.validate = function(value) {
+			return !value || _.isNumber(value);
 		};
 	}
 });

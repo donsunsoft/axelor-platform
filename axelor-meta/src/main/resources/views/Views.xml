@@ -99,9 +99,8 @@
     </group>
     <group title="Actions" cols="1">
         <button name="validate" title="Validate" onClick="action-view-validate"/>
-        <button name="restore" title="Restore" onClick="action-meta-todo"/>
-        <button name="restoreAll" title="Restore All" prompt="All the customizations will be lost. Are you sure?" onClick="action-meta-restore-all"/>
-        <button name="preview" title="Preview" onClick="action-meta-todo"/>
+        <button name="restore" title="Restore" prompt="All the customizations made for this view will be lost. Are you sure ?" onClick="save,action-meta-restore-single"/>
+        <button name="restoreAll" title="Restore All" prompt="All the customizations will be lost. Are you sure ?" onClick="action-meta-restore-all"/>
     </group>
     <field name="xml" showTitle="false" colSpan="2" widget="CodeEditor[syntax=xml|height=500]"/>
 </form>
@@ -212,6 +211,10 @@
   <action-method name="action-meta-restore-all">
     <call class="com.axelor.meta.web.MetaController" method="restoreAll"/>
   </action-method>
+  
+  <action-method name="action-meta-restore-single">
+    <call class="com.axelor.meta.web.MetaController" method="restoreSingle"/>
+  </action-method>
 
   <action-validate name="action-meta-todo">
     <error message="Not implemented yet!"/>
@@ -313,17 +316,17 @@
 
   <grid title="Files" name="meta-files-grid" model="com.axelor.meta.db.MetaFile">
     <field name="fileName"/>
-    <field name="sizeText" width="150"/>
-    <field name="mine" width="250"/>
-    <field name="createdBy"/>
+    <field name="sizeText" width="100"/>
+    <field name="mime" width="175"/>
+    <field name="createdBy" width="175"/>
     <field name="createdOn" width="150"/>
   </grid>
 
   <form title="Files" name="meta-files-form" model="com.axelor.meta.db.MetaFile">
-    <field name="content"/>
+    <field name="content" widget="binary"/>
     <field name="fileName"/>
     <field name="size"/>
-    <field name="mine"/>
+    <field name="mime"/>
     <field name="description"/>
   </form>
 

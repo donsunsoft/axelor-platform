@@ -1104,11 +1104,21 @@ if (typeof Slick === "undefined") {
       var x = 0, w, rule;
       for (var i = 0; i < columns.length; i++) {
         w = columns[i].width;
-
-        rule = getColumnCssRules(i);
-        rule.left.style.left = x + "px";
-        rule.right.style.right = (canvasWidth - x - w) + "px";
-
+        
+        try {
+          rule = getColumnCssRules(i);
+        } catch (e) {
+          var counter = arguments[0] || 0;
+          if (!counter || counter < 5) {
+            return setTimeout(function() {
+              applyColumnWidths(counter + 1);
+            }, 100);
+          }
+        }
+        if (rule) {
+          rule.left.style.left = x + "px";
+          rule.right.style.right = (canvasWidth - x - w) + "px";
+        }
         x += columns[i].width;
       }
     }
@@ -1560,7 +1570,7 @@ if (typeof Slick === "undefined") {
     }
 
     function resizeCanvas() {
-      if (!initialized) { return; }
+      if (!initialized || $viewport.is(':hidden')) { return; }
       if (options.autoHeight) {
         viewportH = options.rowHeight * (getDataLength() + (options.enableAddRow ? 1 : 0));
       } else {

@@ -55,11 +55,11 @@ import com.axelor.data.ImportException;
 import com.axelor.data.ImportTask;
 import com.axelor.data.Importer;
 import com.axelor.data.Listener;
-import com.axelor.data.LoggerManager;
 import com.axelor.data.adapter.DataAdapter;
 import com.axelor.db.JPA;
 import com.axelor.db.Model;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.inject.Injector;
@@ -80,7 +80,7 @@ public class CSVImporter implements Importer {
 
 	private Map<String, Object> context;
 
-	private LoggerManager loggerManager;
+	private CSVLogger loggerManager;
 
 	public void addListener(Listener listener) {
 		this.listeners.add(listener);
@@ -122,7 +122,9 @@ public class CSVImporter implements Importer {
 
 		this.config = CSVConfig.parse(_file);
 		this.injector = injector;
-		this.loggerManager = new LoggerManager(errorDir);
+		if(!Strings.isNullOrEmpty(errorDir)) {
+			this.loggerManager = new CSVLogger(this.config, errorDir);
+		}
 	}
 
 	public CSVImporter(Injector injector, CSVConfig config){
@@ -276,7 +278,7 @@ public class CSVImporter implements Importer {
 
 		LOG.debug("Header {}", Arrays.asList(fields));
 
-		CSVBinder binder = new CSVBinder(beanClass, fields, csvInput);
+		CSVBinder binder = new CSVBinder(beanClass, fields, csvInput, injector);
 		String[] values = null;
 
 		int count = 0;
@@ -324,9 +326,10 @@ public class CSVImporter implements Importer {
 					LOG.error("With following exception:", e);
 
 					// Recover the transaction
-					if (JPA.em().getTransaction().getRollbackOnly()) {
+					if (JPA.em().getTransaction().isActive()) {
 						JPA.em().getTransaction().rollback();
 					}
+
 					if (!JPA.em().getTransaction().isActive()) {
 						JPA.em().getTransaction().begin();
 					}
@@ -393,19 +396,20 @@ public class CSVImporter implements Importer {
 		Map<String, Object> ctx = Maps.newHashMap(context);
 
 		bean = binder.bind(values, ctx);
-		LOG.trace("bean created: {}", bean);
 
 		bean = csvInput.call(bean, ctx, injector);
+		LOG.trace("bean created: {}", bean);
 
 		if (bean != null) {
 			JPA.manage((Model) bean);
 			if(!onRollback) {
 				valuesStack.add(values);
+
+				for(Listener listener : listeners) {
+					listener.imported((Model) bean);
+				}
 			}
 
-			for(Listener listener : listeners) {
-				listener.imported((Model) bean);
-			}
 			LOG.trace("bean saved: {}", bean);
 		}
 
@@ -429,17 +433,21 @@ public class CSVImporter implements Importer {
 
 			try {
 				this.importRow(row, binder, csvInput, context, true);
+
+				if (JPA.em().getTransaction().isActive()) {
+					JPA.em().getTransaction().commit();
+				}
 			} catch (Exception e) {
+				if (JPA.em().getTransaction().isActive()) {
+					JPA.em().getTransaction().rollback();
+				}
+			} finally {
+				if (!JPA.em().getTransaction().isActive()) {
+					JPA.em().getTransaction().begin();
+				}
 			}
 		}
 
-		if (JPA.em().getTransaction().isActive()) {
-			JPA.em().getTransaction().commit();
-			JPA.em().clear();
-			valuesStack.clear();
-		}
-		if (!JPA.em().getTransaction().isActive()) {
-			JPA.em().getTransaction().begin();
-		}
+		valuesStack.clear();
 	}
 }

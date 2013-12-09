@@ -71,6 +71,8 @@ function updateValues(source, target) {
 				if (dest.version) {
 					dest = _.extend({}, dest);
 					updateValues(value, dest);
+				} else {
+					dest.$updatedValues = value;
 				}
 			} else {
 				dest = compact(value);
@@ -264,13 +266,26 @@ ActionHandler.prototype = {
 			context = this._getContext(),
 			deferred = this.ws.defer();
 
-		if (!action) {
-			setTimeout(function(){
-				scope.$apply(function(){
-					deferred.resolve();
-				});
-			});
+		function resolveLater() {
+			deferred.resolve();
 			return deferred.promise;
+		}
+		
+		function chain(items) {
+			var first = _.first(items);
+			if (first === undefined) {
+				return resolveLater();
+			}
+			return self._handleSingle(first).then(function(pending) {
+				if (_.isString(pending)) {
+					return self._handleAction(pending);
+				}
+				return chain(_.rest(items));
+			});
+		}
+
+		if (!action) {
+			return resolveLater();
 		}
 
 		if (action === 'save') {
@@ -284,44 +299,16 @@ ActionHandler.prototype = {
 
 		var model = context._model || scope._model;
 		var promise = this.ws.action(action, model, context).then(function(response){
-			
-			var d = self.ws.defer();
-			
 			var resp = response.data,
-				data = resp.data || [],
-				resolved = true;
-
-			for(var i = 0 ; i < data.length && resolved; i++) {
-				var item = data[i];
-				self._handleSingle(item).then(function(result){
-					resolved = result && !_.isString(result);
-					if (_.isString(result)) {
-						self._handleAction(result).then(function(){
-							d.resolve();
-						});
-					}
-					else if(item.alert || item.error) {
-					    if(resolved) {
-					    	d.resolve();
-					    }
-					    else{
-					    	d.reject();
-					    }
-					}
+				data = resp.data || [];
+			if (resp.errors) {
+				data.splice(0, 0, {
+					errors: resp.errors
 				});
-				
-				if (item.pending || item.alert || item.error) {
-					resolved = false;
-				}
 			}
-
-			if (resolved) {
-				d.resolve();
-			}
-
-			return d.promise;
+			return chain(data);
 		});
-		
+
 		promise.then(function(){
 			deferred.resolve();
 		});
@@ -332,24 +319,14 @@ ActionHandler.prototype = {
 	_handleSingle: function(data) {
 
 		var deferred = this.ws.defer();
-		var resolved_ = deferred.resolve;
-		
-		deferred.resolve = function(handled, pending) {
-			if (!handled) {
-				return resolved_(false);
-			}
-			if (pending) {
-				return resolved_(pending);
-			}
-			resolved_(true);
-		};
 
 		if (data == null || data.length == 0) {
-			deferred.resolve(true);
+			deferred.resolve();
 			return deferred.promise;
 		}
 
-		var scope = this.scope,
+		var self = this,
+			scope = this.scope,
 			formScope = scope,
 			formElement = this.element.parents('form:first');
 
@@ -367,30 +344,39 @@ ActionHandler.prototype = {
 			axelor.dialogs.say(data.flash);
 		}
 
-		if (data.error) {
+		if(data.error) {
 			axelor.dialogs.error(data.error, function(){
-				deferred.resolve(false);
-			});
-			return deferred.promise;
-		}
-
-		if (data.alert) {
-			axelor.dialogs.confirm(data.alert, function(confirmed){
-				setTimeout(function(){
-					scope.$apply(function(){
-						deferred.resolve(confirmed, data.pending);
-					});
+				scope.applyLater(function(){
+					if (data.action) {
+						self._handleAction(data.action);
+					}
+					deferred.reject();
 				});
 			});
 			return deferred.promise;
 		}
 		
+		if (data.alert) {
+			axelor.dialogs.confirm(data.alert, function(confirmed){
+				scope.applyLater(function(){
+					if (confirmed) {
+						return deferred.resolve(data.pending);
+					}
+					if (data.action) {
+						self._handleAction(data.action);
+					}
+					deferred.reject();
+				});
+			}, _t('Warning'));
+			return deferred.promise;
+		}
+		
 		if (!_.isEmpty(data.errors)) {
 			_.each(data.errors, function(v, k){
-				var item = findItems(k).first();
+				var item = (findItems(k) || $()).first();
 				handleError(scope, item, v);
 			});
-			deferred.resolve(false);
+			deferred.reject();
 			return deferred.promise;
 		}
 		
@@ -400,7 +386,7 @@ ActionHandler.prototype = {
 				scope.onChangeNotify(scope, data.values);
 			}
 			this._invalidateContext = true;
-			$.event.trigger('adjustSize');
+			axelor.$adjustSize();
 		}
 		
 		if (data.reload) {
@@ -408,7 +394,7 @@ ActionHandler.prototype = {
 			var promise = scope.reload(true);
 			if (promise) {
 				promise.then(function(){
-					deferred.resolve(true, data.pending);
+					deferred.resolve(data.pending);
 				});
 			}
 			return deferred.promise;
@@ -416,7 +402,7 @@ ActionHandler.prototype = {
 		
 		if (data.save) {
 			this._handleSave().then(function(){
-				deferred.resolve(true, data.pending);
+				deferred.resolve(data.pending);
 			});
 			return deferred.promise;
 		}
@@ -432,19 +418,20 @@ ActionHandler.prototype = {
 										.find('.record-toolbar:first')
 										.add(formElement);
 
-			// first search by x-path
+			// first search by nested x-path
 			if (scope.formPath) {
 				items = containers.find('[x-path="' + scope.formPath + '.' + name + '"]');
 				if (items.size()) {
 					return items;
 				}
-			} else {
-				items = containers.find('[x-path="' + name + '"]');
-				if (items.size()) {
-					return items;
-				}
 			}
-
+			
+			// then search by x-path
+			items = containers.find('[x-path="' + name + '"]');
+			if (items.size()) {
+				return items;
+			}
+		
 			// else search by name
 			items = containers.find('[name="' + name +'"]');
 			if (items.size()) {
@@ -516,6 +503,7 @@ ActionHandler.prototype = {
 					} else if (item.is('label')) {
 						item.html(value);
 					}
+					itemScope.attr('title', value);
 					break;
 				case 'color':
 					//TODO: set color
@@ -588,6 +576,10 @@ ActionHandler.prototype = {
 				if (!views.grid) tab.views.push({type: 'grid'});
 				if (!views.form) tab.views.push({type: 'form'});
 			}
+			
+			if (tab.params && tab.params.popup) {
+				tab.$popupParent = formScope;
+			}
 			openTab(scope, tab);
 		}
 		
@@ -597,7 +589,7 @@ ActionHandler.prototype = {
 			}
 		}
 
-		deferred.resolve(true);
+		deferred.resolve();
 		
 		return deferred.promise;
 	}

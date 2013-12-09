@@ -30,6 +30,8 @@
  */
 package com.axelor.auth;
 
+import java.util.Properties;
+
 import javax.inject.Inject;
 import javax.servlet.ServletContext;
 
@@ -46,6 +48,13 @@ import com.google.inject.name.Names;
 
 public class AuthModule extends ShiroWebModule {
 
+	private Properties properties = new Properties();
+
+	public AuthModule properties(Properties properties) {
+		this.properties = properties;
+		return this;
+	}
+
 	public AuthModule(ServletContext servletContext) {
 		super(servletContext);
 	}
@@ -56,6 +65,16 @@ public class AuthModule extends ShiroWebModule {
 
 		this.bind(JpaSecurity.class).toProvider(AuthSecurity.class);
 		this.expose(JpaSecurity.class);
+
+		this.bindConstant().annotatedWith(Names.named("auth.hash.algorithm")).to("SHA-512");
+		this.bindConstant().annotatedWith(Names.named("auth.hash.iterations")).to(500000);
+		this.bind(Properties.class).annotatedWith(Names.named("auth.ldap.config")).toInstance(properties);
+
+		this.bind(AuthService.class).asEagerSingleton();
+		this.bind(AuthLdap.class).asEagerSingleton();
+
+		this.expose(AuthService.class);
+		this.expose(AuthLdap.class);
 
 		this.bindConstant().annotatedWith(Names.named("app.loginUrl")).to("/login.jsp");
 		this.bindRealm().to(AuthRealm.class);
@@ -71,10 +90,29 @@ public class AuthModule extends ShiroWebModule {
 
 	public static class Simple extends ShiroModule {
 
+		private Properties properties = new Properties();
+
+		public Simple properties(Properties properties) {
+			this.properties = properties;
+			return this;
+		}
+
 		@Override
 		protected void configureShiro() {
+
 			this.bind(JpaSecurity.class).toProvider(AuthSecurity.class);
 			this.expose(JpaSecurity.class);
+
+			this.bindConstant().annotatedWith(Names.named("auth.hash.algorithm")).to("SHA-512");
+			this.bindConstant().annotatedWith(Names.named("auth.hash.iterations")).to(500000);
+			this.bind(Properties.class).annotatedWith(Names.named("auth.ldap.config")).toInstance(properties);
+
+			this.bind(AuthService.class).asEagerSingleton();
+			this.bind(AuthLdap.class).asEagerSingleton();
+
+			this.expose(AuthService.class);
+			this.expose(AuthLdap.class);
+
 			this.bindRealm().to(AuthRealm.class);
 			this.bind(Initializer.class).asEagerSingleton();
 		}

@@ -167,22 +167,28 @@ function GridViewCtrl($scope, $element) {
 
 	$scope.filter = function(searchFilter) {
 
-		var fields = _.pluck($scope.fields, 'name');
-		
+		var fields = _.pluck($scope.fields, 'name'),
+			options = {};
+
 		// if criteria is given search using it
 		if (searchFilter.criteria || searchFilter._domains) {
-			return ds.search({
+			options = {
 				filter: searchFilter,
 				fields: fields
-			});
+			};
+			if (searchFilter.archived !== undefined) {
+				options.archived = searchFilter.archived;
+			}
+			return ds.search(options);
 		}
 
-		var filter =  {}, sortBy, pageNum,
-		domain = null,
-		context = null,
-		criteria = {
-			operator: 'and'
-		};
+		var filter =  {},
+			sortBy, pageNum,
+			domain = null,
+			context = null,
+			criteria = {
+				operator: 'and'
+			};
 
 		for(var name in searchFilter) {
 			var value = searchFilter[name];
@@ -264,7 +270,7 @@ function GridViewCtrl($scope, $element) {
 			context = _.extend({}, $scope._context, context, $scope.getContext());
 		}
 		
-		var options = {
+		options = {
 			filter: criteria,
 			fields: fields,
 			sortBy: sortBy,
@@ -286,6 +292,16 @@ function GridViewCtrl($scope, $element) {
 		}
 	};
 	
+	$scope.pagerIndex = function(fromSelection) {
+		var index = page.index,
+			record = null;
+		if (fromSelection) {
+			record = $scope.dataView.getItem(_.first($scope.selection));
+			index = ds._data.indexOf(record);
+		}
+		return index;
+	};
+
 	$scope.onNext = function() {
 		var fields = _.pluck($scope.fields, 'name');
 		ds.next(fields).then(function(){
@@ -304,18 +320,17 @@ function GridViewCtrl($scope, $element) {
 		page.index = -1;
 		$scope.switchTo('form', function(viewScope){
 			$scope.ajaxStop(function(){
-				setTimeout(function(){
+				$scope.applyLater(function(){
 					viewScope.$broadcast('on:new');
-					viewScope.$apply();
 				});
 			});
 		});
 	};
 	
 	$scope.onEdit = function(force) {
-		page.index = $scope.selection[0];
+		page.index = $scope.pagerIndex(true);
 		$scope.switchTo('form', function (formScope) {
-			if (force) {
+			if (force && formScope.canEdit()) {
 				formScope.onEdit();
 			}
 		});
@@ -422,6 +437,48 @@ function GridViewCtrl($scope, $element) {
 			});
 		});
 	};
+	
+	function focusFirst() {
+		var index = _.first($scope.selection) || 0;
+		var first = $scope.dataView.getItem(index);
+		if (first) {
+			$scope.dataView.$syncSelection([], [first.id], true);
+		}
+	}
+	
+	$scope.onHotKey = function (e, action) {
+		if (action === "save" && $scope.canSave()) {
+			$scope.onSave();
+		}
+		if (action === "refresh") {
+			$scope.onRefresh();
+		}
+		if (action === "new") {
+			$scope.onNew();
+		}
+		if (action === "edit") {
+			if ($scope.canEdit()) {
+				$scope.onEdit(true);
+			} else {
+				focusFirst();
+			}
+		}
+		if (action === "delete" && $scope.canDelete()) {
+			$scope.onDelete();
+		}
+		if (action === "select") {
+			focusFirst();
+		}
+		if (action === "prev" && $scope.canPrev()) {
+			$scope.onPrev();
+		}
+		if (action === "next" && $scope.canNext()) {
+			$scope.onNext();
+		}
+
+		$scope.applyLater();
+		return false;
+	};
 }
 
 angular.module('axelor.ui').directive('uiViewGrid', function(){
@@ -434,57 +491,49 @@ angular.module('axelor.ui').directive('uiViewGrid', function(){
 angular.module('axelor.ui').directive('uiGridExport', function(){
 
 	return {
-		replace: true,
-		scope: {
-		},
-
-		link: function(scope, element, attrs) {
-			var handler = scope.$parent.$eval(attrs.uiGridExport);
+		require: '^uiFilterBox',
+		link: function(scope, element, attrs, ctrl) {
+			var handler = ctrl.$scope.handler;
 			if (!handler) {
 				return;
 			}
-
+	
 			function action(name) {
 				var res = 'ws/rest/' + handler._model + '/export';
 				return name ? res + '/' + name : res;
 			}
-
+	
 			function fields() {
 				return _.pluck(handler.view.items, 'name');
 			}
-
+	
 			var ds = handler._dataSource;
-
-			scope.onExport = function() {
-
+			
+			function onExport() {
 				return ds.export_(fields()).success(function(res) {
-
+	
 					var filePath = action(res.fileName),
 						fileName = res.fileName;
-
+	
 					var link = document.createElement('a');
-
+	
 					link.onclick = function(e) {
 						document.body.removeChild(e.target);
 					};
-
+	
 					link.href = filePath;
 					link.download = fileName;
 					link.innerHTML = fileName;
 					link.style.display = "none";
-
+	
 					document.body.appendChild(link);
-
+	
 					link.click();
 				});
 			};
-		},
-
-		template:
-			"<button class='btn' ng-click='onExport()' title='{{\"Export\" | t}}'>" +
-				"<i class='icon icon-download'></i> " +
-				"<span ng-hide='$parent.tbTitleHide' x-translate>Export</span>" +
-			"</button>"
+			
+			element.on('click', onExport);
+		}
 	};
 });
 
@@ -496,11 +545,10 @@ angular.module('axelor.ui').directive('uiPortletGrid', function(){
 			
 			var ds = $scope._dataSource;
 			var counter = 0;
-
-			$scope.showPager = true;
-			$scope.onItemDblClick = function(event, args) {
-				var selection = $scope.selection[0];
-				var record = ds.at(selection);
+			
+			function doEdit(force) {
+				var index = $scope.pagerIndex(true);
+				var record = ds.at(index);
 
 				var tab = angular.copy($scope._viewParams);
 
@@ -520,11 +568,20 @@ angular.module('axelor.ui').directive('uiPortletGrid', function(){
 							scope.confirmDirty(function() {
 								scope.doRead(record.id).success(function(record){
 									scope.edit(record);
+									if (force) {
+										scope.onEdit();
+									}
 								});
 							});
 						}
 					});
 				});
+			}
+
+			$scope.showPager = true;
+			$scope.onEdit = doEdit;
+			$scope.onItemDblClick = function(event, args) {
+				doEdit(false);
 			};
 			
 			$scope.$on("on:new", function(e) {

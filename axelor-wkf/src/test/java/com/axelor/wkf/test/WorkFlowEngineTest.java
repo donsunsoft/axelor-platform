@@ -43,13 +43,11 @@ import org.junit.runner.RunWith;
 import com.axelor.db.JPA;
 import com.axelor.db.mapper.Mapper;
 import com.axelor.meta.ActionHandler;
-import com.axelor.meta.db.MetaAction;
 import com.axelor.meta.service.MetaModelService;
 import com.axelor.rpc.ActionRequest;
 import com.axelor.test.GuiceModules;
 import com.axelor.test.GuiceRunner;
 import com.axelor.wkf.WkfTest;
-import com.axelor.wkf.action.Action;
 import com.axelor.wkf.data.CreateData;
 import com.axelor.wkf.db.Workflow;
 import com.axelor.wkf.workflow.WorkflowService;
@@ -98,30 +96,13 @@ public class WorkFlowEngineTest {
 	}
 
 	@Test
-	public void actionTest() {
-
-		Map<String, Object> context = Mapper.toMap(wkf);
-		ActionHandler actionHandler = createHandler("", context);
-
-		Action actionWorkflow = new Action();
-
-		actionWorkflow.execute(MetaAction.all().filter("self.name = ?1", "action-test-5").fetchOne(), actionHandler);
-		Map<Object, Object> value = actionWorkflow.getData();
-
-		Assert.assertNotNull(value);
-		Assert.assertFalse(value.isEmpty());
-
-	}
-
-	@Test
 	public void run() {
-
 
 		Map<String, Object> context = Mapper.toMap(wkf);
 		ActionHandler actionHandler = createHandler("", context);
 
 		Assert.assertNotNull( workflowService.run(wkf.getClass().getName(), actionHandler) );
-		Assert.assertEquals( workflowService.getInstance(wkf.getMetaModel().getFullName(), wkf.getId()).getNodes().size(), 1 );
+		Assert.assertEquals( 1, workflowService.getInstance(wkf.getMetaModel().getFullName(), wkf.getId()).getNodes().size() );
 
 	}
 

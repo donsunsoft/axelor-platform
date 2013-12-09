@@ -111,7 +111,7 @@ public class AppServletModule extends JerseyServletModule {
 		});
 
 		// install the auth module
-		install(new AuthModule(getServletContext()));
+		install(new AuthModule(getServletContext()).properties(settings.getProperties()));
 
 		// bind to translations provider
 		bind(Translations.class).toProvider(MetaTranslations.class);

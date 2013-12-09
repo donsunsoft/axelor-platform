@@ -81,6 +81,8 @@ function ViewCtrl($scope, DataSource, ViewService) {
 	$scope.setRouteOptions = function(options) {
 		throw "Not Implemented.";
 	};
+	
+	var switchedTo = null;
 
 	$scope.switchTo = function(viewType, /* optional */ callback) {
 
@@ -92,9 +94,11 @@ function ViewCtrl($scope, DataSource, ViewService) {
 		var promise = view.deferred.promise;
 		promise.then(function(viewScope){
 
-			if (viewScope == null) {
+			if (viewScope == null || switchedTo === viewType) {
 				return;
 			}
+			
+			switchedTo = viewType;
 
 			$scope._viewType = viewType;
 			$scope._viewParams.viewType = viewType; //XXX: remove
@@ -115,6 +119,9 @@ function ViewCtrl($scope, DataSource, ViewService) {
 	if (!params.action) {
 		return;
 	}
+	
+	// hide toolbar button titles
+	$scope.tbTitleHide = __appSettings['application.view.toolbar-title'] === 'hide';
 
 	// show single or default record if specified
 	var context = params.context || {};
@@ -133,6 +140,7 @@ function ViewCtrl($scope, DataSource, ViewService) {
 		}
 		
 		if (context._showRecord > 0) {
+			params.viewType = "form";
 			return $scope.switchTo('form');
 		}
 
@@ -148,8 +156,6 @@ function ViewCtrl($scope, DataSource, ViewService) {
 		});
 	}
 	
-	$scope.tbTitleHide = __appSettings['application.view.toolbar-title'] === 'hide';
-
 	// switch to the the current viewType
 	$scope.switchTo($scope._viewType || 'grid');
 }
@@ -179,13 +185,6 @@ function DSViewCtrl(type, $scope, $element) {
 	$scope.fields = {};
 	$scope.schema = null;
 	
-	setTimeout(function(){
-		$scope.$apply(function(){
-			if (view.deferred)
-				view.deferred.resolve($scope);
-		});
-	});
-
 	$scope.show = function() {
 		if (viewPromise == null) {
 			viewPromise = $scope.loadView(type, view.name);
@@ -199,11 +198,16 @@ function DSViewCtrl(type, $scope, $element) {
 					}
 					toolbar.push(button);
 				});
-
+				if (schema.title) {
+					$scope.viewTitle = schema.title;
+				}
 				$scope.fields = fields;
 				$scope.schema = schema;
 				$scope.toolbar = toolbar;
 				$scope.menubar = schema.menubar;
+
+				// watch on view.loaded to improve performance
+				schema.loaded = true;
 			});
 		}
 		
@@ -288,7 +292,149 @@ function DSViewCtrl(type, $scope, $element) {
 		}
 		return true;
 	};
+	
+	if (view.deferred) {
+		view.deferred.resolve($scope);
+	}
 }
+
+angular.module('axelor.ui').directive('uiViewPane', function() {
+
+	return {
+		replace: true,
+		controller: ['$scope', '$attrs', 'DataSource', 'ViewService', function ($scope, $attrs, DataSource, ViewService) {
+			
+			var params = $scope.$eval($attrs.uiViewPane);
+			
+			$scope._viewParams = params;
+			ViewCtrl.call(this, $scope, DataSource, ViewService);
+			
+			$scope.viewList = [];
+			$scope.viewType = null;
+
+			var switchTo = $scope.switchTo;
+			$scope.switchTo = function (type, callback) {
+				var view = $scope._views[type];
+				if (view && $scope.viewList.indexOf(type) === -1) {
+					$scope.viewList.push(type);
+				}
+				$scope.viewType = type;
+				return switchTo(type, callback);
+			};
+
+			$scope.viewTemplate = function (type) {
+				return 'partials/views/' + type + '.html';
+			};
+
+			$scope.switchTo((params.viewType || params.type));
+		}],
+		link: function(scope, element, attrs) {
+		
+		},
+		template:
+			"<div class='view-pane'>" +
+				"<div class='view-container' ng-repeat='type in viewList' ui-show='type == viewType' ng-include='viewTemplate(type)'></div>" +
+			"</div>"
+	};
+});
+
+angular.module('axelor.ui').directive('uiViewPopup', function() {
+	
+	return {
+		controller: ['$scope', '$attrs', function ($scope, $attrs) {
+			var params = $scope.$eval($attrs.uiViewPopup);
+
+			$scope.tab = params;
+			$scope._isPopup = true;
+		}],
+		link: function (scope, element, attrs) {
+
+			var initialized = false,
+				width = $(window).width(),
+				height = $(window).height();
+
+			width = (60 * width / 100);
+			height = (70 * height / 100);
+
+			function adjust(how) {
+				element.find('input[type=text]:first').focus();
+				axelor.$adjustSize();
+
+				//XXX: ui-dialog issue
+				element.find('.slick-headerrow-column').zIndex(element.zIndex());
+
+				if (initialized) {
+					return;
+				}
+
+				element.dialog('option', 'width', width);
+				element.dialog('option', 'height', height);
+				
+				element.closest('.ui-dialog').position({
+			      my: "center",
+			      at: "center",
+			      of: window
+			    });
+				
+				initialized = true;
+			}
+
+			scope.onPopupOpen = function () {
+				adjust();
+			};
+			
+			var canClose = false;
+			scope.onBeforeClose = function(e) {
+				if (canClose) {
+					return;
+				}
+				e.preventDefault();
+				e.stopPropagation();
+
+				scope.closeTab(scope.tab, function() {
+					canClose = true;
+					element.dialog('close');
+				});
+			};
+
+			scope.onPopupClose = function () {
+				var tab = scope.tab,
+					params = tab.params || {},
+					parent = tab.$popupParent;
+				if (parent && parent.reload && params.popup === "reload") {
+					parent.reload();
+				}
+				scope.applyLater();
+			};
+
+			scope.$watch('viewTitle', function (title) {
+				if (title) {
+					element.closest('.ui-dialog').find('.ui-dialog-title').text(title);
+				}
+			});
+			
+			var unwatch = scope.$watch("_viewParams.$viewScope.schema", function(schema) {
+				if (initialized || !schema) {
+					return;
+				}
+				unwatch();
+				if (schema.width) {
+					width = schema.maxWidth || schema.width;
+				}
+				setTimeout(function () {
+					scope.ajaxStop(function () {
+						element.dialog('open');
+					});
+				});
+			});
+		},
+		replace: true,
+		template:
+			'<div ui-dialog x-on-open="onPopupOpen" x-on-close="onPopupClose" x-on-ok="false" x-on-before-close="onBeforeClose">' +
+				'<div ui-view-pane="tab"></div>' +
+			'</div>'
+	};
+});
 
 angular.module('axelor.ui').directive('uiRecordPager', function(){
 
@@ -342,7 +488,7 @@ angular.module('axelor.ui').directive('uiViewSwitcher', function(){
 					if (page.index === -1) page.index = 0;
 				}
 
-				if (scope.selectedTab.viewType === 'grid' && scope.selection) {
+				if (scope.selectedTab.viewType === 'grid' && !_.isEmpty(scope.selection)) {
 					page.index = _.first(scope.selection);
 				}
 
@@ -369,5 +515,141 @@ angular.module('axelor.ui').directive('uiViewSwitcher', function(){
 		  		'<button class="btn" x-view-type="form"		><i class="icon-edit"		></i></button>'+
 		    '</div>'+
 		'</div>'
+	};
+});
+
+angular.module('axelor.ui').directive('uiHotKeys', function() {
+
+	var keys = {
+		45: 'new',		// insert
+		69: 'edit',		// e
+		83: 'save',		// s
+		68: 'delete',	// d
+		82: 'refresh',	// r
+		70: 'search',	// f
+		71: 'select',	// g
+		74: 'prev',		// j
+		75:	'next',		// n
+
+		77: 'focus-menu',		// m
+	   120: 'toggle-menu',		// F9
+
+		81: 'close'		// q
+	};
+	
+	return function(scope, element, attrs) {
+		
+		var loginWindow = $("#loginWindow");
+		
+		$(document).on('keydown.axelor-keys', function (e) {
+			
+			if (loginWindow.is(":visible")) {
+				return;
+			}
+			
+			var action = keys[e.which];
+			
+			if (action === "toggle-menu") {
+				$('[nav-menu-toggle]').splitter('toggle');
+				return false;
+			}
+			
+			if (e.altKey || e.shiftKey || !e.ctrlKey) {
+				return;
+			}
+
+			if (action === "focus-menu") {
+				var activeMenu = $('.sidebar .nav-tree li.active');
+				if (activeMenu.size() === 0) {
+					activeMenu = $('.sidebar .nav-tree li:first');
+				}
+				
+				var navTree = activeMenu.parents('[nav-tree]:first');
+				if (navTree.size()) {
+					navTree.navtree('selectItem', activeMenu);
+				}
+				return false;
+			}
+			
+			var tab = scope.selectedTab,
+				vs = tab ? tab.$viewScope : null;
+			
+			if (!vs || !keys.hasOwnProperty(e.which)) {
+				return;
+			}
+
+			if (action === "close") {
+				scope.closeTab(tab, function() {
+					scope.applyLater();
+				});
+				return false;
+			}
+			
+			if (action === "search") {
+				var filterBox = $('.filter-box .search-query:visible');
+				if (filterBox.size()) {
+					filterBox.focus().select();
+					return false;
+				}
+			}
+			
+			if (_.isFunction(vs.onHotKey)) {
+				return vs.onHotKey(e, action);
+			}
+		});
+		
+		$(document).on("dblclick.hot-edit", ".form-item-container.readonly", function (e) {
+			var fs = $(e.target).data('$scope');
+			var field = fs ? fs.field : null;
+			if (!field || field.readonly) {
+				return;
+			}
+			if (fs.hasPermission("write") && fs.isReadonly()) {
+				var elem = $(e.target),
+					parent = $(e.target).parent();
+				$.event.trigger('cancel:hot-edit');
+				fs.applyLater(function () {
+					fs.attr("force-edit", true);
+					setTimeout(function() {
+						parent.find(':input:first').focus().select();
+					}, 100);
+					elem.on('cancel:hot-edit', function() {
+						fs.attr("force-edit", false);
+						fs.applyLater();
+					});
+					var unwatch = fs.$watch("attr('force-edit')", function(edit) {
+						if (!edit) {
+							elem.off('cancel:hot-edit');
+							unwatch();
+						}
+					});
+				});
+			}
+		});
+		
+		$(document).on("keydown.hot-edit", ".form-item-container.editable", function (e) {
+			if (!(e.which === 13 || e.which === 27) || e.ctrlKey || e.shiftKey) {
+				return;
+			}
+			var elem = $(e.target);
+			if (!elem.is('.form-item-container')) {
+				elem = elem.parents('.form-item-container:first');
+			}
+
+			var fs = elem.data('$scope');
+			var field = fs ? fs.field : null;
+			if (!field || field.readonly || !fs.attr('force-edit')) {
+				return;
+			}
+			
+			fs.attr("force-edit", false);
+			fs.applyLater();
+		});
+		
+		scope.$on('$destroy', function() {
+			$(document).off('keydown.axelor-keys');
+			$(document).off('dblclick:hot-edit');
+			$(document).off('keydown:hot-edit');
+		});
 	};
 });

@@ -125,14 +125,12 @@ function FormViewCtrl($scope, $element) {
 			record = ds.at(page.index);
 		}
 		viewPromise.then(function(){
-			setTimeout(function(){
+			$scope.ajaxStop(function(){
+				record = ($scope.record || {}).id ? $scope.record : record;
 				if (record === undefined) {
 					$scope.edit(null);
-					$scope.ajaxStop(function(){
-						setTimeout(function(){
-							$scope.$broadcast("on:new");
-							$scope.$apply();
-						});
+					return $scope.ajaxStop(function(){
+						$scope.$broadcast("on:new");
 					});
 				}
 				if (record && record.id)
@@ -203,8 +201,7 @@ function FormViewCtrl($scope, $element) {
 		$scope.$$original = record || {};
 		$scope.$$dirty = false;
 		$scope.record = angular.copy($scope.$$original);
-		setTimeout(function(){
-			$scope.$apply();
+		$scope.ajaxStop(function(){
 			$scope.$broadcast("on:edit", $scope.record);
 			$scope.$broadcast("on:record-change", $scope.record);
 		});
@@ -258,6 +255,14 @@ function FormViewCtrl($scope, $element) {
 	};
 
 	$scope.$watch("record", function(rec, old) {
+		var view = $scope.schema;
+		if (view && view.readonlyIf) {
+			var readonly = axelor.$eval($scope, view.readonlyIf, rec);
+			if (_.isFunction($scope.attr)) {
+				$scope.attr('readonly', readonly);
+			}
+			editable = !readonly;
+		}
 		if (rec === old) {
 			return $scope.$$dirty = false;
 		}
@@ -297,21 +302,44 @@ function FormViewCtrl($scope, $element) {
 		});
 	};
 	
-	$scope.$on("on:new", function(event){
-		$scope._viewPromise.then(function(){
-			var handler = $scope.$events.onNew,
-				record = $scope.record;
-			$scope.setEditable();
-			if (handler && record) {
-				setTimeout(function () {
-					var promise = handler();
-					if (promise && promise.then) {
-						promise.then(function () {
-							if ($scope.isDirty()) $scope.editRecord(record);
-						});
-					}
-				});
+	$scope.onNewPromise = null;
+	
+	$scope.$on("on:new", function onNewHandler(event) {
+		
+		function afterVewLoaded() {
+			
+			var handler = $scope.$events.onNew;
+			var last = $scope.$parent.onNewPromise || $scope.onNewPromise;
+			
+			function reset() {
+				$scope.onNewPromise = null;
 			}
+			
+			function handle() {
+				var promise = handler();
+				if (promise && promise.then) {
+					promise.then(reset, reset);
+					promise = promise.then(function () {
+						if ($scope.isDirty()) {
+							return $scope.editRecord($scope.record);
+						}
+					});
+				}
+				return promise;
+			}
+
+			$scope.setEditable();
+
+			if (handler && $scope.record) {
+				if (last) {
+					return $scope.onNewPromise = last.then(handle);
+				}
+				$scope.onNewPromise = handle();
+			}
+		}
+		
+		$scope._viewPromise.then(function() {
+			$scope.$timeout(afterVewLoaded);
 		});
 	});
 	
@@ -412,19 +440,19 @@ function FormViewCtrl($scope, $element) {
 		return defer.promise;
 	};
 	
-	$scope.confirmDirty = function(callback) {
-
-		if (!$scope.isDirty())
+	$scope.confirmDirty = function(callback, cancelCallback) {
+		var params = $scope._viewParams || {};
+		if (!$scope.isDirty() || (params.params && params.params['show-confirm'] === false)) {
 			return callback();
-
+		}
 		axelor.dialogs.confirm(_t("Current changes will be lost. Do you really want to proceed?"), function(confirmed){
-			if (!confirmed)
+			if (!confirmed) {
+				if (cancelCallback) {
+					cancelCallback();
+				}
 				return;
-			setTimeout(function(){
-				$scope.$apply(function(){
-					callback();
-				});
-			});
+			}
+			$scope.applyLater(callback);
 		});
 	};
 
@@ -516,6 +544,49 @@ function FormViewCtrl($scope, $element) {
 				if (record && record.id) doEdit(record.id);
 			});
 		});
+	};
+
+	function focusFirst() {
+		$scope._viewPromise.then(function() {
+			setTimeout(function() {
+				$element.find('form :input:visible').not('[readonly],[type=checkbox]').first().focus().select();
+			});
+		});
+	}
+
+	$scope.onHotKey = function (e, action) {
+		
+		if (action === "save" && $scope.canSave()) {
+			$scope.onSave();
+		}
+		if (action === "refresh") {
+			$scope.onRefresh();
+		}
+		if (action === "new") {
+			$scope.onNew();
+		}
+		if (action === "edit") {
+			if ($scope.canEdit()) {
+				$scope.onEdit();
+			}
+			focusFirst();
+		}
+		if (action === "select") {
+			focusFirst();
+		}
+		if (action === "prev" && $scope.canPrev()) {
+			$scope.onPrev();
+		}
+		if (action === "next" && $scope.canNext()) {
+			$scope.onNext();
+		}
+		if (action === "search") {
+			$scope.onBack();
+		}
+		
+		$scope.applyLater();
+		
+		return false;
 	};
 };
 
@@ -631,10 +702,14 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 			return parent;
 		}
 
-		var elem = $('<form name="form" ui-form ui-table-layout ui-actions ui-widget-states></form>');
+		var elem = $('<form name="form" ui-form-gate ui-form ui-table-layout ui-actions ui-widget-states></form>');
 		elem.attr('x-cols', schema.cols)
 		  	.attr('x-widths', schema.colWidths);
 
+		if (schema.css) {
+			elem.addClass(schema.css);
+		}
+		
 		process(schema.items, elem);
 		
 		return elem;
@@ -678,7 +753,7 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 		var logInfo = null;
 		scope.onShowLog = function(e) {
 			if (logInfo === null) {
-				logInfo = $(e.target).parents("div:first").find("button").popover({
+				logInfo = $(e.delegateTarget).popover({
 					title: _t('Update Log'),
 					html: true,
 					content: getContent,
@@ -711,6 +786,11 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 			var view = scope.schema;
 			return view ? view.helpLink : false;
 		};
+		
+		scope.hasWidth = function() {
+			var view = scope.schema;
+			return view && view.width;
+		};
 
 		scope.onShowHelp = function() {
 			window.open(scope.schema.helpLink);
@@ -739,15 +819,37 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 			$(document).off('mousedown.loginfo', onMouseDown);
 		});
 
-		var unwatch = scope.$watch('schema', function(schema){
+		var unwatch = scope.$watch('schema.loaded', function(viewLoaded){
 
-			if (!schema) return;
+			if (!viewLoaded) return;
+			
 			unwatch();
 
+			var schema = scope.schema;
 			var form = parse(scope, schema, scope.fields);
 
 			form = $compile(form)(scope);
 			element.append(form);
+			
+			if (!scope._isPopup) {
+				element.addClass('has-width');
+			}
+			
+			var first = _.first(schema.items) || {};
+			if (!schema.width && !schema.colWidths && schema.cols < 4 && !first.items) {
+				schema.width = 600;
+			}
+			
+			if (schema.width) {
+				if (schema.width === '100%' || schema.width === '*') {
+					element.removeClass('has-width');
+				}
+				form.css({
+					width: schema.width,
+					minWidth: schema.minWidth,
+					maxWidth: schema.maxWidth
+				});
+			}
 			
 			if (scope._viewResolver) {
 				scope._viewResolver.resolve(schema, element);
@@ -758,5 +860,3 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 }]);
 
 }).call(this);
-
-

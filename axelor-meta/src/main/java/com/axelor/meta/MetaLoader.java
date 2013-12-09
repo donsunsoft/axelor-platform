@@ -33,6 +33,7 @@ package com.axelor.meta;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -140,8 +141,15 @@ public class MetaLoader {
 	}
 
 	private ObjectViews unmarshal(String xml) throws JAXBException {
-		StringReader reader = new StringReader(prepareXML(xml));
-		return (ObjectViews) unmarshaller.unmarshal(reader);
+		synchronized (unmarshaller) {
+			return (ObjectViews) unmarshaller.unmarshal(new StringReader(prepareXML(xml)));
+		}
+	}
+
+	private void marshal(ObjectViews views, Writer writer) throws JAXBException {
+		synchronized (marshaller) {
+			marshaller.marshal(views, writer);
+		}
 	}
 
 	private String stripWhiteSpaces(String text) {
@@ -192,7 +200,7 @@ public class MetaLoader {
 			views.setViews((List)obj);
 		}
 		try {
-			marshaller.marshal(views, writer);
+			marshal(views, writer);
 		} catch (JAXBException e) {
 			e.printStackTrace();
 		}
@@ -698,6 +706,58 @@ public class MetaLoader {
 				}
 			}
 		}
+	}
+
+	public Boolean loadSingleViews(String name, String module) {
+		Boolean found = null;
+		List<File> files = MetaScanner.findAll("views\\.(.*?)\\.xml");
+
+		for(File file : files) {
+			String pat = String.format("(/WEB-INF/lib/%s-)|(%s/WEB-INF/classes/)", module, module);
+			Pattern pattern = Pattern.compile(pat);
+			String path = file.toString();
+			Matcher matcher = pattern.matcher(path);
+			if (matcher.find()) {
+				found = loadSingleFile(file, module, name);
+				if(found) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	private Boolean loadSingleFile(final File file, final String module, String name) {
+		try {
+			ObjectViews views = (ObjectViews) unmarshaller.unmarshal(file.openInputStream());
+
+			if (views.getViews() != null) {
+				for(final AbstractView view : views.getViews()) {
+					if(view.getName() != null && view.getName().equals(name)) {
+						JPA.runInTransaction(new Runnable() {
+
+							@Override
+							public void run() {
+								loadView(view, module, file.getRelativePath());
+							}
+						});
+						return true;
+					}
+				}
+			}
+
+		}
+		catch (JAXBException e) {
+			Throwable ex = e.getLinkedException();
+			ex = ex == null ? e : ex;
+			log.error("Invalid XML input: {} -> {}", module, file.getRelativePath(), ex);
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return false;
 	}
 
 	private static ModuleResolver moduleResolver = new ModuleResolver();

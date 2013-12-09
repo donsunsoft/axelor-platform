@@ -2,22 +2,6 @@
 <object-views xmlns="http://apps.axelor.com/xml/ns/object-views"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://apps.axelor.com/xml/ns/object-views http://apps.axelor.com/xml/ns/object-views/object-views_0.9.xsd">
- 
-<!-- SELECTS -->
-
-    <selection name="node.type.selection">
-		<option value="start">Start</option>
-		<option value="intermediary">Intermediary</option>
-		<option value="stop">Stop</option>
-		<option value="gateway">Gateway</option>
-	</selection>
-    
-    <selection name="node.logic.operator.selection">
-    	<option value=""></option>
-		<option value="and">AND</option>
-		<option value="or">OR</option>
-		<option value="xor">XOR</option>
-	</selection>
 
 <!-- VIEWS -->
     
@@ -30,7 +14,7 @@
         <field name="active"/>
     </grid>
     
-    <form name="workflow-form" title="Workflow" cols="4" model="com.axelor.wkf.db.Workflow" onSave="wkf-validate">
+    <form name="workflow-form" title="Workflow" cols="4" model="com.axelor.wkf.db.Workflow" >
     	<toolbar>
 	        <button name="openEditor" title="Editor" onClick="save,wkf-method-open-editor"/>
 	        <button name="openInstances" title="Instances" onClick="save,wkf-method-open-instances"/>
@@ -39,7 +23,7 @@
         <field name="name"/>
         <field name="metaModel"/>
 		<field name="maxNodeCounter"/>
-		<field name="node" />
+		<field name="node" grid-view="start-event-grid" form-view="start-event-form"/>
 	    <field name="sequence" />
 	    <field name="condition" />
         <field name="active" readonlyIf="archived" />
@@ -57,29 +41,6 @@
         </notebook>
     </form>
     
-    <!-- NODE -->
-    <grid name="node-grid" title="Nodes" model="com.axelor.wkf.db.Node">
-        <field name="name"/>
-        <field name="type"/>
-        <field name="action"/>
-    </grid>
-    
-    <form name="node-form" title="Node" cols="4" model="com.axelor.wkf.db.Node" onNew="node-default-record-group" >
-        <field name="type" onChange="node-record-name"/>
-        <field name="name"/>
-        <field name="action" hideIf="type != 'intermediary'"/>
-        <field name="logicOperator" hideIf="type != 'gateway'" />
-        <break/>
-        <group name="startGroup" colSpan="2" cols="2" hideIf="type == 'start'" >
-	        <field name="startTransitions" colSpan="2" grid-view="start-transition-grid" form-view="start-transition-form" showTitle="false"/>
-        </group>
-        <group name="endGroup" colSpan="2" cols="2" hideIf="type == 'stop'">
-	        <field name="endTransitions" colSpan="2" grid-view="end-transition-grid" form-view="end-transition-form" showTitle="false"/>
-        </group>
-        <separator title="Description" colSpan="4"/>
-   		<field name="description" colSpan="4" showTitle="false" widget="Html"/>
-    </form>
-    
     <!-- TRANSITION -->
     <grid name="transition-grid" title="Transitions" model="com.axelor.wkf.db.Transition">
         <field name="sequence"/>
@@ -94,8 +55,8 @@
     <form name="transition-form" title="Transition" cols="4" model="com.axelor.wkf.db.Transition">
         <field name="sequence"/>
         <field name="name"/>
-        <field name="startNode" summary-view="node-form" form-view="node-form" edit-window="self"/>
-        <field name="nextNode" summary-view="node-form" form-view="node-form" edit-window="self" domain="self.type != 'start'"/>
+        <field name="startNode" summary-view="node-form" form-view="node-form" edit-window="self" canNew="false"/>
+        <field name="nextNode" summary-view="node-form" form-view="node-form" edit-window="self" domain="self.type != 'start'" canNew="false"/>
         <field name="role" />
         <field name="signal"/>
         <field name="condition" />
@@ -115,7 +76,7 @@
     <form name="start-transition-form" title="Transition" cols="6" model="com.axelor.wkf.db.Transition">
         <field name="sequence"/>
         <field name="name"/>
-        <field name="startNode" summary-view="node-form" form-view="node-form" edit-window="self"/>
+        <field name="startNode" summary-view="node-form" form-view="node-form" edit-window="self" canNew="false"/>
         <field name="role" />
         <field name="signal"/>
         <field name="condition"/>
@@ -135,7 +96,7 @@
     <form name="end-transition-form" title="Transition" cols="6" model="com.axelor.wkf.db.Transition">
         <field name="sequence"/>
         <field name="name"/>
-        <field name="nextNode" summary-view="node-form" form-view="node-form" edit-window="self" domain="self.type != 'start'"/>
+        <field name="nextNode" summary-view="node-form" form-view="node-form" edit-window="self" domain="self.type != 'start'" canNew="false"/>
         <field name="role" />
         <field name="signal"/>
         <field name="condition"/>
@@ -153,29 +114,10 @@
     <action-attrs name="wkf-import-hidden">
         <attribute name="hidden" for="importWorkflow" expr="true"/> 
     </action-attrs>
-
-	<!-- VALIDATE -->
-	<action-validate name="wkf-validate">
-		<error message="Can't save workflow without start node" if="node?.type != 'start'"/>
-	</action-validate>
     
     <!-- RECORD -->
     <action-record name="wkf-record-archived" model="com.axelor.wkf.db.Workflow">
     	<field name="active" expr="eval: !archived"/>
-    </action-record>
-    
-    <action-record name="node-start-default-record" model="com.axelor.wkf.db.Node">
-    	<field name="type" expr="start"/>
-    	<field name="name" expr="Start :"/>
-    </action-record>
-    
-    <action-record name="node-default-record" model="com.axelor.wkf.db.Node">
-    	<field name="type" expr="intermediary"/>
-    	<field name="name" expr="eval: 'INTERMEDIARY:'"/>
-    </action-record>
-    
-    <action-record name="node-record-name" model="com.axelor.wkf.db.Node">
-    	<field name="name" expr="eval: type?.toUpperCase() + ':'"/>
     </action-record>
     
     <!-- METHOD -->
@@ -190,11 +132,5 @@
     <action-method name="wkf-method-import-workflow">
     	<call class="com.axelor.wkf.web.WkfController" method="importWorkflow"/>
     </action-method>
-	
-	<!-- GROUP -->
-	<action-group name="node-default-record-group">
-		<action name="node-start-default-record" if="_parent?._model == 'com.axelor.wkf.db.Workflow'"/>
-		<action name="node-default-record" if="_parent?._model != 'com.axelor.wkf.db.Workflow'"/>
-	</action-group>
     
 </object-views>

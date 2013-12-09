@@ -91,6 +91,8 @@ ui.formWidget('BaseSelect', {
 			
 			minLength: 0,
 			
+			position: {  collision: "flip"  },
+			
 			source: function(request, response) {
 				scope.loadSelection(request, response);
 			},
@@ -212,9 +214,7 @@ ui.formInput('Select', 'BaseSelect', {
 		
 		function update(value) {
 			scope.setValue(value, true);
-			setTimeout(function(){
-				scope.$apply();
-			});
+			scope.applyLater();
 		}
 
 		scope.handleDelete = function(e) {
@@ -231,6 +231,63 @@ ui.formInput('Select', 'BaseSelect', {
 			input.val(this.getText());
 		};
 	}
+});
+
+ui.formInput('ImageSelect', 'Select', {
+	
+	BLANK: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
+	
+	link: function(scope, element, attrs) {
+		this._super(scope, element, attrs);
+		
+		var field = scope.field;
+		var formatItem = scope.formatItem;
+
+		scope.canShowText = function () {
+			return field.labels === undefined || field.labels;
+		};
+
+		scope.formatItem = function (item) {
+			if (scope.canShowText()) {
+				return formatItem(item);
+			}
+			return "";
+		};
+		
+		scope.$watch('getValue()', function (value, old) {
+			scope.image = value || this.BLANK;
+			element.toggleClass('empty', !value);
+		}.bind(this));
+	},
+	
+	link_editable: function(scope, element, attrs) {
+		this._super(scope, element, attrs);
+		var input = this.findInput(element);
+		
+		input.data('ui-autocomplete')._renderItem = function(ul, item) {
+			var a = $("<a>").append($("<img>").attr("src", item.value));
+			var el = $("<li>").addClass("image-select-item").append(a).appendTo(ul);
+			
+			if (scope.canShowText()) {
+				a.append($("<span></span>").html(item.label));
+			}
+			
+			return el;
+		};
+	},
+	template_readonly:
+		'<span class="image-select readonly">'+
+			'<img ng-src="{{image}}"></img> <span ng-show="canShowText()">{{text}}</span>' +
+		'</span>',
+
+	template_editable:
+		'<span class="picker-input image-select">'+
+			'<img ng-src="{{image}}"></img>' +
+			'<input type="text" autocomplete="off">'+
+			'<span class="picker-icons">'+
+				'<i class="icon-caret-down" ng-click="showSelection()"></i>'+
+			'</span>'+
+		'</span>'
 });
 
 ui.formInput('MultiSelect', 'Select', {
@@ -328,9 +385,7 @@ ui.formInput('MultiSelect', 'Select', {
 
 		function update(value) {
 			scope.setValue(value, true);
-			setTimeout(function(){
-				scope.$apply();
-			});
+			scope.applyLater();
 		}
 		
 		scope.removeItem = function(item) {
@@ -427,9 +482,7 @@ ui.formInput('SelectQuery', 'Select', {
 		
 		function update(value) {
 			scope.setValue(value);
-			setTimeout(function(){
-				scope.$apply();
-			});
+			scope.applyLater();
 		}
 
 		scope.format = function(value) {
@@ -519,7 +572,7 @@ ui.formInput('NavSelect', {
 			
 			// if selection change is used to show/hide some elements
 			// the layout should be adjustted
-			$.event.trigger('adjustSize');
+			axelor.$adjustSize();
 		};
 
 	},
@@ -529,7 +582,7 @@ ui.formInput('NavSelect', {
 	'<div class="nav-select">'+
 	'<ul class="steps">'+
 		'<li ng-repeat="select in selection" ng-class="{ active: getValue() == select.value }">'+
-			'<a href="" ng-click="onSelect(select)">{{select.title}}</a>'+
+			'<a href="" tabindex="-1" ng-click="onSelect(select)">{{select.title}}</a>'+
 		'</li>'+
 		'<li></li>'+
 	'</ul>'+

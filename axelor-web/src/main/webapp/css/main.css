@@ -52,6 +52,10 @@ html, body {
 	min-width: 940px;
 }
 
+.navbar .brand-logo {
+	float: left;
+}
+
 .view-tabs {
 	background-color: white;
 }
@@ -387,16 +391,35 @@ header .navbar-inverse .dropdown-submenu:focus > a {
 	z-index: 2100;
 }
 
+input[disabled], select[disabled], textarea[disabled],
+input[readonly], select[readonly], textarea[readonly] {
+	cursor: default;
+}
+
 /* end Browser fixes */
 
 .navigation-tabs ul.nav-tabs-main {
 	margin-bottom: 0px;
+	padding: 0 6px;
 	height: 35px;
 }
 
 .navigation-tabs {
 	position: absolute;
-	top: 8px; left: 4px; right: 4px; bottom: 4px;
+	top: 8px; left: 0; right: 0; bottom: 0;
+}
+
+.navigation-tabs > .nav-tabs-wrap {
+	margin-right: 100px;
+}
+
+.navigation-tabs > .nav-tabs-wrap li.dirty a:before {
+	content: '*';
+	margin-right: 2px;
+}
+
+.navigation-tabs > .axelor-logo {
+	border-bottom: 1px solid #ddd;
 }
 
 .visible-false {
@@ -430,7 +453,8 @@ header .navbar-inverse .dropdown-submenu:focus > a {
 
 .grid-view > .slickgrid {
 	position: absolute !important;
-	top: 46px; left: 0px; right: 0px; bottom: 0px;
+	top: 43px; left: 0px; right: 0px; bottom: 0px;
+	border: none;
 }
 
 .record-toolbar {
@@ -448,7 +472,7 @@ header .navbar-inverse .dropdown-submenu:focus > a {
 	border-radius: 0;
 	
 	margin: 0;
-	padding: 0;
+	padding: 0 4px;
 }
 
 .record-toolbar button {
@@ -581,8 +605,9 @@ header .navbar-inverse .dropdown-submenu:focus > a {
 	margin: 0 0 8px;
 }
 
-.search-view .search-view-form {
-
+.search-view .search-view-form,
+.search-view .search-view-toolbar {
+	margin: 4px;
 }
 
 .search-view .search-view-toolbar table.form-layout {
@@ -597,6 +622,7 @@ header .navbar-inverse .dropdown-submenu:focus > a {
 .search-view .search-view-grid .slickgrid {
 	position: absolute;
 	top: 0; left: 0; right: 0; bottom: 0;
+	border: none;
 }
 
 .unselectable-text {
@@ -643,4 +669,14 @@ img.prefix-icon {
 .record-toolbar .menu-bar a.disabled:focus {
 	background-color: inherit;
 	background-image: inherit;
+}
+
+.nvtooltip {
+	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;;
+	font-size: inherit;
+}
+
+.nvtooltip h3 {
+	font-size: 13px;
+	font-weight: bold;
 }

@@ -68,7 +68,7 @@ ui.formWidget('Group', {
 		scope.setCollapsed = function(collapsed) {
 			scope.collapsed = collapsed;
 			element.children('legend').nextAll(':not(br)')[collapsed ? 'hide' : 'show']();
-			$.event.trigger('adjustSize');
+			axelor.$adjustSize();
 		};
 
 		scope.toggle = function() {
@@ -84,10 +84,12 @@ ui.formWidget('Group', {
 		if (attrs.title === attrs.field) {
 			attrs.$set('title', '');
 		}
-		
-		attrs.$observe('title', function(value){
-			scope.title = value;
-		});
+
+		if (props.showTitle !== false) {
+			attrs.$observe('title', function(value){
+				scope.title = value;
+			});
+		}
 	},
 	transclude: true,
 	template:
@@ -120,7 +122,7 @@ ui.formWidget('Portlet', {
 		element.resizable({
 			handles: 's',
 			resize: _.debounce(function() {
-				$.event.trigger('adjustSize');
+				axelor.$adjustSize();
 				element.width('auto');
 			}, 100)
 		});
@@ -144,24 +146,35 @@ ui.formWidget('Tabs', {
 	controller: ['$scope', '$element', function($scope, $element) {
 		
 		var tabs = $scope.tabs = [],
-			selected = 0;
+			selected = -1;
+		
+		var doSelect = _.debounce(function doSelect() {
+			var select = tabs[selected];
+			if (select) {
+				select.handleSelect();
+			}
+		}, 100);
 		
 		$scope.select = function(tab) {
 			
 			var current = selected;
 
 			angular.forEach(tabs, function(tab, i){
-				tab.selected = false;
+				tab.tabSelected = false;
 			});
 			
-			tab.selected = true;
+			tab.tabSelected = true;
 			selected = _.indexOf(tabs, tab);
+			
+			if (current === selected) {
+				return;
+			}
 			
 			setTimeout(function() {
 				if ($scope.$tabs) {
 					$scope.$tabs.trigger('adjust');
 				}
-				$.event.trigger('adjustSize');
+				axelor.$adjustSize();
 				if(current != selected){
 					doSelect();
 				}
@@ -182,13 +195,6 @@ ui.formWidget('Tabs', {
 			return $element.find('ul.nav-tabs:first > li:nth-child(' + (index+1) + ')');
 		}
 		
-		function doSelect() {
-			var select = tabs[selected];
-			if (select) {
-				select.handleSelect();
-			}
-		}
-		
 		this.showTab = function(index) {
 			
 			if (!inRange(index)) {
@@ -205,7 +211,7 @@ ui.formWidget('Tabs', {
 				return $scope.select(tabs[index]);
 			}
 
-			$.event.trigger('adjustSize');
+			axelor.$adjustSize();
 		};
 		
 		this.hideTab = function(index) {
@@ -222,10 +228,10 @@ ui.formWidget('Tabs', {
 			item.removeClass('active');
 			
 			tab.hidden = true;
-			tab.selected = false;
+			tab.tabSelected = false;
 			
 			if (!wasHidden && selected > -1 && selected !== index)
-				return $.event.trigger('adjustSize');
+				return axelor.$adjustSize();
 			
 			for(var i = 0 ; i < tabs.length ; i++) {
 				var tab = tabs[i];
@@ -243,9 +249,7 @@ ui.formWidget('Tabs', {
 			pageScope.tab.title = value;
 		};
 		
-		$scope.$on('on:edit', function(event){
-			doSelect();
-		});
+		$scope.$on('on:edit', doSelect);
 	}],
 	
 	link: function(scope, elem, attrs) {
@@ -257,7 +261,7 @@ ui.formWidget('Tabs', {
 		});
 		
 		elem.on('click', '.dropdown-toggle', function(e){
-			$.event.trigger('adjustSize');
+			axelor.$adjustSize();
 		});
 		
 		// set height (#1011)
@@ -273,7 +277,7 @@ ui.formWidget('Tabs', {
 				'<div class="nav-tabs-scroll-r"><a tabindex="-1" href="#"><i class="icon-chevron-right"></i></a></div>' +
 				'<div class="nav-tabs-strip">' +
 					'<ul class="nav nav-tabs">' +
-						'<li tabindex="-1" ng-repeat="tab in tabs" ng-class="{active:tab.selected}">'+
+						'<li tabindex="-1" ng-repeat="tab in tabs" ng-class="{active:tab.tabSelected}">'+
 							'<a tabindex="-1" href="" ng-click="select(tab)">'+
 								'<img class="prefix-icon" ng-show="tab.icon" ng-src="{{tab.icon}}">'+
 								'<span ng-bind-html-unsafe="tab.title"></span>'+
@@ -310,7 +314,7 @@ ui.formWidget('Tab', {
 
 	link: function(scope, elem, attrs, tabs) {
 		
-		scope.selected = false;
+		scope.tabSelected = false;
 		scope.icon = scope.field && scope.field.icon;
 
 		tabs.addTab(scope);
@@ -335,7 +339,7 @@ ui.formWidget('Tab', {
 	},
 	cellCss: 'form-item v-align-top',
 	transclude: true,
-	template: '<div ui-actions class="tab-pane" ng-class="{active: selected}" x-layout-selector="&gt; div:first">'+
+	template: '<div ui-actions class="tab-pane" ng-class="{active: tabSelected}" x-layout-selector="&gt; div:first">'+
 		'<div ui-transclude></div>'+
 	'</div>'
 });

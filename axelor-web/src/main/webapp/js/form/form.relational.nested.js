@@ -64,6 +64,7 @@ function EmbeddedEditorCtrl($scope, $element, DataSource, ViewService) {
 	ViewCtrl($scope, DataSource, ViewService);
 	FormViewCtrl.call(this, $scope, $element);
 
+	$scope.visible = false;
 	$scope.onShow = function() {
 		
 	};
@@ -85,12 +86,14 @@ function EmbeddedEditorCtrl($scope, $element, DataSource, ViewService) {
 			$scope.edit($scope.getSelectedRecord());
 			return;
 		}
+		$scope.visible = false;
 		$element.hide();
 		$element.data('$rel').show();
 	};
 	
 	$scope.edit = function(record) {
 		doEdit(record);
+		$scope.setEditable(!$scope.$parent.$$readonly);
 	};
 
 	$scope.onClose = function() {
@@ -132,7 +135,7 @@ var EmbeddedEditor = {
 	scope: true,
 	controller: EmbeddedEditorCtrl,
 	template:
-		'<fieldset class="form-item-group bordered-box">'+
+		'<fieldset class="form-item-group bordered-box" ui-show="visible">'+
 			'<div ui-view-form x-handler="this"></div>'+
 			'<div class="btn-toolbar pull-right">'+
 				'<button type="button" class="btn btn btn-info" ng-click="onClose()" ng-show="isReadonly()"><span x-translate>Back</span></button> '+
@@ -176,25 +179,37 @@ var NestedEditor = {
 			updateFlag = true;
 		
 		function setValidity(nested, valid) {
-			setTimeout(function(){
-				model.$setValidity('valid', nested.isValid());
-				if (scope.setValidity) {
-					scope.setValidity('valid', nested.isValid());
-				}
-				scope.$apply();
-			});
+			model.$setValidity('valid', nested.isValid());
+			if (scope.setValidity) {
+				scope.setValidity('valid', nested.isValid());
+			}
 		}
 		
 		function configure(nested) {
 			
 			//FIX: select on M2O doesn't apply to nested editor
-			scope.$watch(attrs.ngModel + '.id', function(){
-				setTimeout(function(){
-					nested.$apply();
-				});
+			var valueSet = false;
+			scope.$watch(attrs.ngModel + '.id', function(id, old){
+				if (id === old && valueSet) return;
+				valueSet = true;
+				scope.applyLater();
+			});
+			
+			//FIX: accept values updated with actions
+			scope.$watch(attrs.ngModel + '.$updatedValues', function(value) {
+				if (!nested || !value) return;
+				var record = nested.record || {};
+				if (record.id === value.id) {
+					_.extend(record, value);
+				}
 			});
 
-			nested.$watch('form.$valid', function(valid){
+			var validitySet = false;
+			nested.$watch('form.$valid', function(valid, old){
+				if (valid === old && validitySet) {
+					return;
+				}
+				validitySet = true;
 				setValidity(nested, valid);
 			});
 			nested.$watch('record', function(rec, old){
@@ -214,6 +229,7 @@ var NestedEditor = {
 		}
 		
 		scope.ngModel = model;
+		scope.visible = false;
 		
 		scope.onClear = function() {
 			scope.$parent.setValue(null, true);
@@ -221,7 +237,8 @@ var NestedEditor = {
 		};
 
 		scope.onClose = function() {
-			scope.$parent.__nestedOpen = false;
+			scope.$parent._isNestedOpen = false;
+			scope.visible = false;
 			element.hide();
 		};
 
@@ -236,7 +253,7 @@ var NestedEditor = {
 		model.$render = function() {
 			var nested = scope.nested,
 				promise = nested._viewPromise,
-				value = model.$viewValue;
+				oldValue = model.$viewValue;
 
 			if (nested == null)
 				return;
@@ -247,20 +264,24 @@ var NestedEditor = {
 					configure(nested);
 				});
 			}
-			if (value == null || !value.id || value.$dirty) {
-				return nested.edit(value);
-			}
 			
-			promise.then(function(){
-				nested.doRead(value.id).success(function(record){
+			promise.then(function() {
+				var value = model.$viewValue;
+				if (oldValue !== value) { // prevent unnecessary onLoad
+					return;
+				}
+				if (!value || !value.id || value.$dirty) {
+					return nested.edit(value);
+				}
+				return nested.doRead(value.id).success(function(record){
 					updateFlag = false;
-					nested.edit(record);
+					return nested.edit(record);
 				});
 			});
 		};
 	},
 	template:
-	'<fieldset class="form-item-group bordered-box">'+
+	'<fieldset class="form-item-group bordered-box" ui-show="visible">'+
 		'<legend>'+
 			'<span ng-bind-html-unsafe="title"></span> '+
 			'<span class="legend-toolbar" ng-show="!isReadonly()">'+

@@ -35,6 +35,7 @@ var app = angular.module("axelor.app");
 app.factory('NavService', ['$location', 'MenuService', function($location, MenuService) {
 
 	var tabs = [];
+	var popups = [];
 	var selected = null;
 
 	var VIEW_TYPES = {
@@ -97,9 +98,17 @@ app.factory('NavService', ['$location', 'MenuService', function($location, MenuS
 			openTab(tab, options);
 		});
 	}
+	
+	function openTabAsPopup(tab, options) {
+		popups.push(tab);
+	}
 
 	function openTab(tab, options) {
 
+		if (tab && tab.$popupParent) {
+			return openTabAsPopup(tab, options);
+		}
+		
 		var found = findTab(tab.action);
 
 		options = options || tab.options;
@@ -137,25 +146,35 @@ app.factory('NavService', ['$location', 'MenuService', function($location, MenuS
 
 		setTimeout(function(){
 			$.event.trigger('adjust');
-			setTimeout(function(){
-				$.event.trigger('adjustSize');
-			});
+			axelor.$adjustSize();
 		});
 	}
 
-	function __closeTab(tab) {
-		var index = _.indexOf(tabs, tab);
+	function __closeTab(tab, callback) {
+		
+		var all = tab.$popupParent ? popups : tabs;
+		var index = _.indexOf(all, tab);
 
 		// remove tab
-		tabs.splice(index, 1);
+		all.splice(index, 1);
+		
+		if (tabs.length === 0) {
+			selected = null;
+		}
+		if (_.isFunction(callback)) {
+			callback();
+		}
+		if (tab.$popupParent) {
+			return;
+		}
 
 		if (tab.selected) {
 			if (index == tabs.length)
 				index -= 1;
-			_.each(tabs, function(tab){
+			_.each(all, function(tab){
 				tab.selected = false;
 			});
-			var select = tabs[index];
+			var select = all[index];
 			if (select) {
 				select.selected = true;
 				openTab(select);
@@ -169,20 +188,20 @@ app.factory('NavService', ['$location', 'MenuService', function($location, MenuS
 		return tab.closable === undefined ? true : tab.closable;
 	}
 
-	function closeTab(tab) {
+	function closeTab(tab, callback) {
 		var viewScope = tab.$viewScope;
 		if (viewScope && viewScope.confirmDirty) {
 			viewScope.confirmDirty(function(){
-				__closeTab(tab);
+				__closeTab(tab, callback);
 			});
 		} else {
-			__closeTab(tab);
+			__closeTab(tab, callback);
 		}
 	}
 	
-	function closeTabOthers(current) {
-		var i, tab, viewScope;
-		
+	function closeTabs(selection) {
+		var all = _.flatten([selection], true);
+
 		function select(tab) {
 			if (!tab.selected) {
 				tab.selected = true;
@@ -190,25 +209,57 @@ app.factory('NavService', ['$location', 'MenuService', function($location, MenuS
 			}
 		}
 		
-		for (i = 0; i < tabs.length; i++) {
-			tab = tabs[i];
-			if (tab === current) {
-				select(tab);
-				continue;
+		function close(tab, ignore) {
+			var at = tabs.indexOf(tab);
+			if (at > -1) {
+				tabs.splice(at, 1);
 			}
-			viewScope = tab.$viewScope;
-			if (viewScope && viewScope.confirmDirty) {
-				viewScope.confirmDirty(function(){
-					tabs.splice(i, 1);
-					closeTabOthers(current);
-				});
-				select(tab);
-			} else {
-				tabs.splice(i, 1);
-				closeTabOthers(current);
+			closeTabs(_.difference(selection, [ignore, tab]));
+			if (tabs.length === 0) {
+				selected = null;
 			}
-			break;
 		}
+
+		for (var i = 0; i < all.length; i++) {
+			var tab = all[i];
+			var viewScope = tab.$viewScope;
+			if (viewScope && viewScope.confirmDirty) {
+				select(tab);
+				return viewScope.confirmDirty(function(){
+					return close(tab);
+				}, function() {
+					close(null, tab);
+					viewScope.applyLater();
+				});
+			}
+			return close(tab);
+		}
+
+		if (tabs.indexOf(selected) == -1) {
+			selected = null;
+		}
+		
+		if (selected) {
+			return openTab(selected);
+		}
+		
+		var first = _.first(tabs);
+		if (first && !first.selected) {
+			return openTab(first);
+		}
+		
+		axelor.$adjustSize();
+	}
+	
+	function closeTabOthers(current) {
+		var rest = _.filter(tabs, function(tab) {
+			return canCloseTab(tab) && tab !== current;
+		});
+		if (current && !current.selected) {
+			current.selected = true;
+			openTab(current);
+		}
+		return closeTabs(rest);
 	}
 	
 	function closeTabAll() {
@@ -217,6 +268,10 @@ app.factory('NavService', ['$location', 'MenuService', function($location, MenuS
 
 	function getTabs() {
 		return tabs;
+	}
+	
+	function getPopups() {
+		return popups;
 	}
 
 	function getSelected() {
@@ -231,6 +286,7 @@ app.factory('NavService', ['$location', 'MenuService', function($location, MenuS
 		closeTabOthers: closeTabOthers,
 		closeTabAll: closeTabAll,
 		getTabs: getTabs,
+		getPopups: getPopups,
 		getSelected: getSelected
 	};
 }]);
@@ -243,12 +299,22 @@ function NavCtrl($scope, $rootScope, $location, NavService) {
 			return NavService.getTabs();
 		}
 	});
+	
+	$scope.navPopups = Object.defineProperty($scope, 'navPopups', {
+		get: function() {
+			return NavService.getPopups();
+		}
+	});
 
 	$scope.selectedTab = Object.defineProperty($scope, 'selectedTab', {
 		get: function() {
 			return NavService.getSelected();
 		}
 	});
+	
+	$scope.hasNabPopups = function () {
+		return $scope.navPopups && $scope.navPopups.length > 0;
+	};
 
 	$scope.menuClick = function(event, record) {
 		if (record.isFolder)
@@ -308,23 +374,43 @@ function NavCtrl($scope, $rootScope, $location, NavService) {
 		return NavService.openTabByName(name, options);
 	};
 
-	$scope.closeTab = function(tab) {
-		return NavService.closeTab(tab);
+	$scope.closeTab = function(tab, callback) {
+		var wasSelected = tab.selected;
+		if (NavService.canCloseTab(tab)) {
+			NavService.closeTab(tab, callback);
+			if ($scope.selectedTab && wasSelected) {
+				$scope.$broadcast("on:nav-click", $scope.selectedTab);
+			}
+		}
 	};
 	
 	$scope.closeTabOthers = function(tab) {
-		return NavService.closeTabOthers(tab);
+		var wasSelected = tab.selected;
+		NavService.closeTabOthers(tab);
+		if ($scope.selectedTab === tab && !wasSelected) {
+			$scope.$broadcast("on:nav-click", tab);
+		}
 	};
 	
 	$scope.closeTabAll = function() {
 		return NavService.closeTabAll();
 	};
+	
+	$scope.tabTitle = function(tab) {
+		return tab.title;
+	};
 
+	$scope.tabDirty = function(tab) {
+		var viewScope = tab.$viewScope;
+		if (viewScope && viewScope.isDirty) {
+			return viewScope.isDirty();
+		}
+		return false;
+	};
+	
 	$scope.$watch('selectedTab.viewType', function(viewType){
 		if (viewType) {
-			setTimeout(function(){
-				$.event.trigger('adjustSize');
-			});
+			axelor.$adjustSize();
 		}
 	});
 
@@ -343,19 +429,23 @@ function NavCtrl($scope, $rootScope, $location, NavService) {
 TabCtrl.$inject = ['$scope', '$location', '$routeParams'];
 function TabCtrl($scope, $location, $routeParams) {
 
-	var params = _.clone($routeParams),
+	var app = $scope.app || {},
+		params = _.clone($routeParams),
 		search = _.clone($location.$$search);
 
-	var resource = params.resource,
-		state = params.state,
-		mode = params.mode;
+	if (app.homeAction) {
+		$scope.openTabByName(app.homeAction, {
+			__tab_prepend: true,
+			__tab_closable: false
+		});
+	}
 
-	if (resource) {
-        $scope.openTabByName(resource, {
-        	mode: mode,
-        	state: state,
+	if (params.resource) {
+        $scope.openTabByName(params.resource, {
+    		mode: params.mode,
+        	state: params.state,
         	search: search
-        });
+    	});
     }
 }
 

@@ -5,15 +5,22 @@
 
   <module name="auth" package="com.axelor.auth.db"/>
 
-  <entity name="User" sequential="true" cachable="true">
+  <entity name="User" cachable="true">
+    <![CDATA[
+    This object store the users.
+    ]]>
+    
     <string name="code" required="true" unique="true" min="2" title="Login"/>
     <string name="name" required="true" unique="true" min="2"/>
-    <string name="password" required="true" min="4"/>
+    <string name="password" password="true" required="true" min="4"/>
     <boolean name="blocked" default="false" title="Blocked user ?" help="Specify whether to block the user for an indeterminate times."/>
     <date name="activeFrom" title="Active user from" help="Specify whether to allow the user from this specific date."/>
     <date name="activeTo" title="Active user to" help="Specify whether to allow the user until this specific date."/>
     <many-to-one name="group" ref="Group" column="group_id"/>
     <many-to-many name="roles" ref="com.axelor.auth.db.Role"/>
+    
+    <finder-method name="findByGroup" using="Long:groupId" filter="self.group[].id = :groupId" cacheable="true" all="false"/>
+    <finder-method name="findByGroup" using="String:groupCode" filter="self.group[].code = :groupCode" cacheable="true" all="false"/>
   </entity>
   
 </domain-models>

@@ -35,6 +35,8 @@ import org.apache.shiro.authc.AuthenticationInfo;
 import org.apache.shiro.authc.AuthenticationToken;
 import org.apache.shiro.authc.SimpleAuthenticationInfo;
 import org.apache.shiro.authc.UsernamePasswordToken;
+import org.apache.shiro.authc.credential.CredentialsMatcher;
+import org.apache.shiro.authc.credential.PasswordMatcher;
 import org.apache.shiro.authz.AuthorizationInfo;
 import org.apache.shiro.authz.SimpleAuthorizationInfo;
 import org.apache.shiro.realm.AuthorizingRealm;
@@ -46,10 +48,57 @@ import com.axelor.auth.db.User;
 
 public class AuthRealm extends AuthorizingRealm {
 
+	public static class AuthMatcher extends PasswordMatcher {
+
+		@Override
+		public boolean doCredentialsMatch(AuthenticationToken token, AuthenticationInfo info) {
+
+			//TODO: remove plain text match in final version
+			Object plain = getSubmittedPassword(token);
+			Object saved = getStoredPassword(info);
+			AuthService service = AuthService.getInstance();
+
+			if (plain instanceof char[]) {
+				plain = new String((char[]) plain);
+			}
+
+			try {
+				return service.ldapLogin((String) token.getPrincipal(), (String) plain);
+			} catch (IllegalStateException e) {
+			} catch (AuthenticationException e) {
+				return false;
+			}
+
+			if (service.match((String) plain, (String) saved)) {
+				return true;
+			}
+
+			return super.doCredentialsMatch(token, info);
+		}
+	}
+
+	private CredentialsMatcher credentialsMatcher = new AuthMatcher();
+
+	@Override
+	public CredentialsMatcher getCredentialsMatcher() {
+		return credentialsMatcher;
+	}
+
 	@Override
 	protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
 
 		final String code = ((UsernamePasswordToken) token).getUsername();
+		final String passwd = new String(((UsernamePasswordToken) token).getPassword());
+
+		final AuthService service = AuthService.getInstance();
+		if (service.ldapEnabled()) {
+			try {
+				service.ldapLogin(code, passwd);
+			} catch (IllegalStateException e) {
+			} catch (AuthenticationException e) {
+			}
+		}
+
 		final User user = AuthUtils.getUser(code);
 
 		if (user == null || user.getBlocked() == true) {

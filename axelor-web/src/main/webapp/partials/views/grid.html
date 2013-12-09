@@ -1,4 +1,4 @@
-<div class="grid-view" ng-controller="GridViewCtrl">
+<div class="grid-view" ng-controller="GridViewCtrl" ui-tab-gate>
   <div class="navbar record-toolbar">
     <div class="navbar-inner">
       <div class="container">
@@ -15,13 +15,12 @@
           <button class="btn" ng-click="onDelete()" ng-if="hasButton('delete')" ng-disabled="!canDelete()" title="{{ 'Delete' | t}}">
             <i class="icon icon-remove"></i> <span ng-hide="tbTitleHide" x-translate>Delete</span>
           </button>
-          <button class="btn" ui-grid-export="this" ng-if="hasButton('export')"></button>
         </div>
         <div ui-filter-box x-handler="this"></div>
-        <div ui-menu-bar menus="menubar" handler="this"></div>
-        <div class="btn-group" ng-if="toolbar">
-          <button ng-repeat="btn in toolbar" class="btn" ui-tool-button="btn">{{btn.title}}</button>
+        <div class="btn-group" ng-if="toolbar" ui-btn-group-helper>
+          <button ng-repeat="btn in toolbar | filter:{custom: true}" class="btn" ui-tool-button="btn">{{btn.title}}</button>
         </div>
+        <div ui-menu-bar menus="menubar" handler="this"></div>
         <div ui-view-switcher class="pull-right"></div>
         <div ui-record-pager class="pull-right"></div>
       </div>

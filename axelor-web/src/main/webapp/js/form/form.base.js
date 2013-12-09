@@ -61,40 +61,86 @@ ui.formCompile = function(element, attrs, linkerFn) {
 		var getViewDef = this.getViewDef || scope.getViewDef || function() {return {}; };
 
 		var field = getViewDef.call(scope, element);
-		var props = _.pick(field, ['readonly', 'required', 'hidden']);
+		var props = _.pick(field, ['readonly', 'required', 'hidden', 'title']);
 		var state = _.clone(props);
 		
 		if (field.css) {
 			element.addClass(field.css);
 		}
+		if (field.width && field.width !== '*') {
+			element.width(field.width);
+		}
 		
 		scope.$events = {};
 		scope.field = field || {};
 		
+		scope.$$readonly = undefined;
+		
 		scope.attr = function(name) {
 			if (arguments.length > 1) {
+				var old = state[name];
 				state[name] = arguments[1];
 				if (name === "highlight") {
 					setHighlight(state.highlight);
+				}
+				if (old !== state[name]) {
+					scope.$broadcast("on:attrs-changed", {
+						name: name,
+						value: state[name]
+					});
 				}
 			}
 			return state[name];
 		};
 		
-		scope.$on("on:edit", function(e, rec){
+		scope.$on("on:edit", function(e, rec) {
 			if (_.isEmpty(rec)) {
 				state = _.clone(props);
 			}
+			state["force-edit"] = false;
+			scope.$$readonly = scope.$$isReadonly();
+		});
+		
+		scope.$on("on:attrs-changed", function(event, attr) {
+			if (attr.name === "readonly" || attr.name === "force-edit") {
+				scope.$$readonly = scope.$$isReadonly();
+			}
+		});
+		
+		scope.$watch("isEditable()", function(editable, old) {
+			if (editable === undefined) return;
+			if (editable === old) return;
+			scope.$$readonly = scope.$$isReadonly();
 		});
 
 		scope.isRequired = function() {
 			return this.attr("required") || false;
 		};
 		
-		scope.isReadonly = function() {
-			var parent = this.$parent;
-			if (parent && parent.isReadonly && parent.isReadonly()) {
+		scope.isReadonlyExclusive = function() {
+			var parent = this.$parent || {};
+			if (scope._isPopup && !parent._isPopup) {
+				return this.attr("readonly") || false;
+			}
+			if (parent.isReadonlyExclusive && parent.isReadonlyExclusive()) {
 				return true;
+			}
+			return this.attr("readonly") || false;
+		};
+		
+		scope.isReadonly = function() {
+			if (scope.$$readonly === undefined) {
+				scope.$$readonly = scope.$$isReadonly();
+			}
+			return scope.$$readonly;
+		};
+		
+		scope.$$isReadonly = function() {
+			if ((this.hasPermission && !this.hasPermission('read')) || this.isReadonlyExclusive()) {
+				return true;
+			}
+			if (!this.attr("readonly") && this.attr("force-edit")) {
+				return false;
 			}
 			if (scope.isEditable && !scope.isEditable()) {
 				return true;
@@ -139,7 +185,14 @@ ui.formCompile = function(element, attrs, linkerFn) {
 				parent = elem;
 			if (label_parent.size())
 				label = label_parent;
-			return hidden ? parent.add(label).hide() : parent.add(label).show();
+			
+			if (hidden) {
+				parent.add(label).hide();
+			} else {
+				parent.add(label).show();
+			}
+
+			return axelor.$adjustSize();
 		}
 
 		var hideFn = _.contains(this.handles, 'isHidden') ? angular.noop : hideWidget;
@@ -155,16 +208,24 @@ ui.formCompile = function(element, attrs, linkerFn) {
 		scope.$watch("isReadonly()", function(readonly, old) {
 			if (readonlySet && readonly === old) return;
 			readonlySet = true;
-			return element.toggleClass("readonly", readonly);
+			element.toggleClass("readonly", readonly);
+			element.toggleClass("editable", !readonly);
 		});
 		
-		function setHighlight(highlight) {
-			var params = field.hilite,
-				label = null;
-			if (params && params.css) {
-				label = element.data('label') || $();
-				element.toggleClass(params.css, highlight);
-				label.toggleClass(params.css.replace(/(hilite-[^-]+\b(?!-))/g, ''), highlight);
+		function setHighlight(args) {
+
+			function doHilite(params, passed) {
+				var label = element.data('label') || $();
+				element.toggleClass(params.css, passed);
+				label.toggleClass(params.css.replace(/(hilite-[^-]+\b(?!-))/g, ''), passed);
+			}
+			
+			_.each(field.hilites, function(p) {
+				if (p.css) doHilite(p, false);
+			});
+			
+			if (args && args.hilite && args.hilite.css) {
+				doHilite(args.hilite, args.passed);
 			}
 		}
 
@@ -299,6 +360,17 @@ ui.formDirective = function(name, object) {
 					model.$setValidity('invalid', valid);
 				});
 			}
+			
+			scope.$on('$destroy', function() {
+				if (scope.$elem_editable) {
+					scope.$elem_editable.remove();
+					scope.$elem_editable = null;
+				}
+				if (scope.$elem_readonly) {
+					scope.$elem_readonly.remove();
+					scope.$elem_readonly = null;
+				}
+			});
 		});
 
 		return object;

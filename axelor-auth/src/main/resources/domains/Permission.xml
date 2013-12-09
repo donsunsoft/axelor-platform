@@ -5,13 +5,18 @@
 
   <module name="auth" package="com.axelor.auth.db"/>
 
-  <entity name="Permission" sequential="true" cachable="true">
+  <entity name="Permission" cachable="true">
+    <![CDATA[
+    This object store the permissions.
+    ]]>
+    
     <string name="name" required="true" unique="true" />
     <string name="object" required="true"/>
     <boolean name="canRead" title="Read"/>
     <boolean name="canWrite" title="Write"/>
     <boolean name="canCreate" title="Create"/>
     <boolean name="canRemove" title="Remove"/>
+    <boolean name="canExport" title="Export"/>
     <string name="readCondition"/>
     <string name="readParams"/>
     <string name="writeCondition"/>
@@ -20,6 +25,8 @@
     <string name="createParams"/>
     <string name="removeCondition"/>
     <string name="removeParams"/>
+    <string name="exportCondition"/>
+    <string name="exportParams"/>
   </entity>
 
 </domain-models>

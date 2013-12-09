@@ -51,14 +51,29 @@ ui.formInput('Boolean', {
 		
 		element.click(function(){
 			scope.setValue(this.checked);
-			setTimeout(function(){
-				scope.$apply();
+			scope.applyLater(function(){
 				setTimeout(onChange);
 			});
 		});
 	},
 	template_editable: '<input type="checkbox">',
 	template_readonly: '<input type="checkbox" disabled="disabled" ng-checked="text">'
+});
+
+/**
+ * The Boolean widget with label on right.
+ */
+ui.formInput('InlineCheckbox', 'Boolean', {
+	css: 'checkbox-inline',
+	showTitle: false,
+	link: function (scope, element, attrs, model) {
+		this._super.apply(this, arguments);
+		scope.$watch('attr("title")', function(title) {
+			scope.label = title;
+		});
+	},
+	template_editable: '<label class="checkbox"><input type="checkbox" ng-model="record[field.name]"> {{label}}</label>',
+	template_readonly: '<label class="checkbox"><input type="checkbox" disabled="disabled" ng-checked="text"> {{label}}</label>'
 });
 
 })(this);

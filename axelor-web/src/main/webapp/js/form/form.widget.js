@@ -79,13 +79,115 @@ ui.formWidget('Form', {
 			}
 			scope.ajaxStop(function() {
 				element.show();
-				$.event.trigger('adjustSize');
+				axelor.$adjustSize();
 			});
 		});
 	}
 });
 
-ui.directive('uiWidgetStates', function() {
+/**
+ * This directive is used filter $watch on scopes of inactive tabs.
+ *
+ */
+ui.directive('uiTabGate', function() {
+
+	return {
+		
+		compile: function compile(tElement, tAttrs) {
+			
+			return {
+				pre: function preLink(scope, element, attrs) {
+					scope.$watchChecker(function(current) {
+						if (current.tabSelected === undefined) {
+							return !scope.tab || scope.tab.selected;
+						}
+						return current.tabSelected;
+					});
+				}
+			};
+		}
+	};
+});
+
+/**
+ * This directive is used to filter $watch on scopes of hidden forms.
+ *
+ */
+ui.directive('uiFormGate', function() {
+
+	return {
+		compile: function compile(tElement, tAttrs) {
+
+			return {
+				pre: function preLink(scope, element, attrs) {
+					var parent = null;
+					scope.$watchChecker(function(current) {
+						if (scope.tabSelected === false) {
+							return false;
+						}
+						if (parent === null) {
+							parent = element.parents('[ui-show]:first');
+						}
+						return !(parent.hasClass('ui-hide') || parent.hasClass('ui-hide'));
+					});
+				}
+			};
+		}
+	};
+});
+
+/**
+ * This directive is used to filter $watch on scopes based on some condition.
+ *
+ */
+ui.directive('uiWatchIf', ['$parse', function($parse) {
+	
+	return {
+		compile: function compile(tElement, tAttrs) {
+			return {
+				pre: function preLink(scope, element, attrs) {
+					var value = false,
+						expression = $parse(attrs.uiWatchIf);
+					
+					scope.$watchChecker(function (current) {
+						if (current === scope) {
+							return value = expression(scope);
+						}
+						return value;
+					});
+				}
+			};
+		}
+	};
+}]);
+
+function toBoolean(value) {
+	if (value && value.length !== 0) {
+		var v = angular.lowercase("" + value);
+		value = !(v == 'f' || v == '0' || v == 'false' || v == 'no' || v == 'n' || v == '[]');
+	} else {
+		value = false;
+	}
+	return value;
+}
+
+/**
+ * This directive is used to speedup uiFormGate.
+ */
+ui.directive('uiShow', function() {
+
+	return {
+		scope: true, // create new scope to always watch the expression
+		link: function link(scope, element, attrs) {
+			scope.$$shouldWatch = true;
+			scope.$watch(attrs.uiShow, function uiShowWatchAction(value){
+				element.css('display', toBoolean(value) ? '' : 'none').toggleClass('ui-hide', !toBoolean(value));
+			});
+		}
+	};
+});
+
+ui.directive('uiWidgetStates', ['$parse', function($parse) {
 
 	function isValid(scope, name) {
 		if (!name) return scope.isValid();
@@ -113,16 +215,53 @@ ui.directive('uiWidgetStates', function() {
 		scope.$watch("isReadonly()", watcher);
 		scope.$watch("isRequired()", watcher);
 		scope.$watch("isValid()", watcher);
+		
+		var expr = $parse(condition);
 
 		function watcher(current, old) {
 			if (current !== old) handle(scope.record);
 		}
 
 		function handle(rec) {
-			var value = axelor.$eval(scope, condition, rec);
-			if (negative) { value = !value; };
-			scope.attr(attr, value);
+			var value = undefined;
+			try {
+				value = axelor.$eval(scope, expr, rec);
+			} catch (e) {}
+			scope.attr(attr, negative ? !value : value);
 		}
+	}
+	
+	function handleHilites(scope, field) {
+		if (!field || _.isEmpty(field.hilites)) {
+			return;
+		}
+		
+		var hilites = field.hilites || [];
+		var exprs = _.map(_.pluck(hilites, 'condition'), $parse);
+
+		function handle(rec) {
+			for (var i = 0; i < hilites.length; i++) {
+				var hilite = hilites[i];
+				var expr = exprs[i];
+				var value = false;
+				try {
+					value = axelor.$eval(scope, expr, rec);
+				} catch (e) {}
+				if (value) {
+					return scope.attr('highlight', {
+						hilite: hilite,
+						passed: value
+					});
+				}
+			}
+			return scope.attr('highlight', {});
+		}
+		
+		scope.$on("on:record-change", function(e, rec) {
+			if (rec === scope.record) {
+				handle(rec);
+			}
+		});
 	}
 	
 	function register(scope) {
@@ -143,9 +282,7 @@ ui.directive('uiWidgetStates', function() {
 		handleFor("required", "requiredIf");
 		handleFor("collapse", "collapseIf");
 
-		if (field.hilite) {
-			handleCondition(scope, field, "highlight", field.hilite.condition);
-		}
+		handleHilites(scope, field);
 	};
 
 	return function(scope, element, attrs) {
@@ -153,6 +290,6 @@ ui.directive('uiWidgetStates', function() {
 			register(scope);
 		});
 	};
-});
+}]);
 
 })(this);

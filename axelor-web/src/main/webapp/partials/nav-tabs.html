@@ -1,12 +1,12 @@
-<div class="navigation-tabs">
+<div class="navigation-tabs" ui-hot-keys>
   <div class="nav-tabs-wrap">
 	<div class="nav-tabs-scroll-l"><a href="#"><i class="icon-chevron-left"></i></a></div>
 	<div class="nav-tabs-scroll-r"><a href="#"><i class="icon-chevron-right"></i></a></div>
 	<div class="nav-tabs-strip">
 	<ul class="nav nav-tabs nav-tabs-main nav-tabs-scrollable nav-tabs-closable">
-	 <li ng-repeat="tab in navTabs" ng-class="{ active: tab.selected, inactive: !tab.selected }">
+	 <li ng-repeat="tab in navTabs" ng-class="{ active: tab.selected, inactive: !tab.selected, dirty: tabDirty(tab) }">
 	   <a href="" ng-click="navClick(tab)">
-	     <img class="prefix-icon" ng-show="tab.icon" ng-src="{{tab.icon}}"><span>{{tab.title}}</span>
+	     <img class="prefix-icon" ng-show="tab.icon" ng-src="{{tab.icon}}"><span>{{tabTitle(tab)}}</span>
 	   </a>
 	   <i ng-show="canCloseTab(tab)" class="icon-remove" ng-click="closeTab(tab)"></i>
 	 </li>
@@ -14,13 +14,11 @@
 	</div>
   </div>
   <div class="view-content">
-    <div class="view-pane" ng-show="tab.selected" ng-repeat="tab in navTabs" ng-controller="ViewCtrl">
-    	<div class="view-container" ng-show="selectedTab.viewType == view.type" ng-repeat="view in tab.views"
-    		ng-include src="'partials/views/'+ view.type +'.html'"></div>
-    </div>
+    <div ng-show="tab.selected" ng-repeat="tab in navTabs" ui-view-pane="tab"></div>
   </div>
-  <a href="http://axelor.com" tabindex="-1" target="_blank" style="position: absolute; position: absolute; right: 0px; top: 0px;">
-    <img src="img/axelor.png" width="100" height="32">
+  <a href="http://axelor.com" tabindex="-1" target="_blank" class="axelor-logo"
+    style="position: absolute; right: 0px; top: 3px;">
+    <img src="img/axelor.png" style="width: 100px; height: 32px">
   </a>
   <div id="nav-tabs-menu" class="dropdown clearfix">
     <ul class="dropdown-menu" style="display:block;position:static;margin-bottom:5px;">
@@ -29,4 +27,5 @@
       <li><a href="" tabindex="-1" ng-click="closeTabAll()" x-translate>Close All</a></li>
     </ul>
   </div>
+  <div class="nav-tabs-popup" ng-repeat="tab in navPopups" ui-view-popup="tab"></div>
 </div>

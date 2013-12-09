@@ -63,8 +63,8 @@ function OneToManyCtrl($scope, $element, DataSource, ViewService, initCallback) 
 	};
 	
 	var _showNestedEditor = $scope.showNestedEditor;
-	$scope.showNestedEditor = function(record) {
-		_showNestedEditor(record);
+	$scope.showNestedEditor = function(show, record) {
+		_showNestedEditor(show, record);
 		if (embedded) {
 			embedded.data('$rel').hide();
 			embedded.data('$scope').edit(record);
@@ -80,7 +80,8 @@ function OneToManyCtrl($scope, $element, DataSource, ViewService, initCallback) 
 			detailView.data('$scope').isDetailView = true;
 			$element.after(detailView);
 		}
-		detailView.show();
+		var es = detailView.data('$scope');
+		detailView.toggle(es.visible = !es.visible);
 	};
 	
 	$scope.select = function(value) {
@@ -112,8 +113,7 @@ function OneToManyCtrl($scope, $element, DataSource, ViewService, initCallback) 
 		});
 		
 		$scope.setValue(records, true);
-		setTimeout(function(){
-			$scope.$apply();
+		$scope.applyLater(function(){
 			$scope.$broadcast('grid:changed');
 		});
 	};
@@ -147,9 +147,7 @@ function OneToManyCtrl($scope, $element, DataSource, ViewService, initCallback) 
 		});
 		
 		$scope.setValue(records, fireOnChange);
-		setTimeout(function(){
-			$scope.$apply();
-		});
+		$scope.applyLater();
 	};
 
 	$scope.removeSelected = function(selection) {
@@ -192,7 +190,7 @@ function OneToManyCtrl($scope, $element, DataSource, ViewService, initCallback) 
 	$scope.onSummary = function() {
 		var selected = $scope.getSelectedRecord();
 		if (selected) {
-			$scope.showNestedEditor(selected);
+			$scope.showNestedEditor(true, selected);
 		}
 	};
 	
@@ -338,24 +336,37 @@ ui.formInput('OneToMany', {
 			});
 		}
 
+		var doRenderUnwatch = null;
+		var doViewPromised = false;
+
 		function doRender() {
-			var unwatch = null;
-			return scope._viewPromise.then(function () {
-				if (unwatch) return;
-				unwatch = scope.$watch(function () {
-					if (element.is(':hidden')) return;
-					unwatch();
+			if (doRenderUnwatch) {
+				return;
+			}
+			doRenderUnwatch = scope.$watch(function () {
+				if (!isVisible() || !doViewPromised) {
+					return;
+				}
+				doRenderUnwatch();
+				doRenderUnwatch = null;
 					fetchData();
 				});
-			});
 		};
+		
+		function isVisible() {
+			return element.parents('.tab-content.form-item').filter(':hidden').size() === 0;
+		}
 
-		model.$render = _.debounce(function () {
-			setTimeout(function () {
+		scope._viewPromise.then(function () {
+			doViewPromised = true;
+			if (doRenderUnwatch) {
+				doRenderUnwatch();
+				doRenderUnwatch = null;
 				doRender();
-				scope.$apply();
+			}
 			});
-		}, 100);
+
+		model.$render = doRender;
 		
 		var adjustSize = (function() {
 			var rowSize = 26,
@@ -369,7 +380,7 @@ ui.formInput('OneToMany', {
 					height = (rowSize * count) + (minSize + rowSize);
 				}
 				element.css('min-height', Math.min(height, maxSize));
-				$.event.trigger('adjustSize');
+				axelor.$adjustSize();
 			};
 		})();
 		
@@ -403,12 +414,12 @@ ui.formInput('OneToMany', {
 			}
 			var col = {
 				id: '_summary',
-				name: '',
+				name: '<span>&nbsp;</span>',
 				sortable: false,
 				resizable: false,
 				width: 16,
 				formatter: function(row, cell, value, columnDef, dataContext) {
-					return '<i class="icon-caret-right" style="display: inline-block; cursor: pointer; padding: 1px 4px;"></i>';
+					return '<i class="icon-caret-right" style="display: inline-block; cursor: pointer; padding: 2px 8px; font-size: 15.5px;"></i>';
 				}
 			};
 			
@@ -637,9 +648,7 @@ ui.formInput('TagSelect', 'ManyToMany', 'MultiSelect', {
 					input.val("");
 				});
 				ui.item.click.call(scope);
-				return setTimeout(function(){
-					scope.$apply();
-				});
+				return scope.applyLater();
 			}
 			return _handleSelect.apply(this, arguments);
 		};
@@ -666,9 +675,11 @@ ui.formInput('OneToManyInline', 'OneToMany', {
 			
 		};
 		
+		var field = scope.field;
 		var input = element.children('input');
 		var grid = element.children('[ui-slick-grid]');
 		
+		var container = null;
 		var wrapper = $('<div class="slick-editor-dropdown"></div>')
 			.css("position", "absolute")
 			.hide();
@@ -686,7 +697,7 @@ ui.formInput('OneToManyInline', 'OneToMany', {
 		};
 		
 		setTimeout(function(){
-			var container = element.parents('.view-container');
+			container = element.parents('.ui-dialog-content,.view-container').first();
 			grid.height(175).appendTo(wrapper);
 			wrapper.height(175).appendTo(container);
 		});
@@ -698,7 +709,7 @@ ui.formInput('OneToManyInline', 'OneToMany', {
 				my: "left top",
 				at: "left bottom",
 				of: element,
-				within: "#container"
+				within: container
 			})
 			.zIndex(element.zIndex() + 1)
 			.width(element.width());
@@ -719,6 +730,20 @@ ui.formInput('OneToManyInline', 'OneToMany', {
 		
 		element.on("adjustSize", _.debounce(adjust, 300));
 		
+		function hidePopup(e) {
+			if (element.is(':hidden')) {
+				return;
+			}
+			var all = element.add(wrapper);
+			var elem = $(e.target);
+			if (all.is(elem) || all.has(elem).size() > 0) return;
+			if (elem.zIndex() > element.parents('.slickgrid:first').zIndex()) return;
+
+			element.trigger('close:slick-editor');
+		}
+		
+		$(document).on('mousedown.mini-grid', hidePopup);
+		
 		scope.$watch(attrs.ngModel, function(value) {
 			var text = "";
 			if (value && value.length)
@@ -726,9 +751,25 @@ ui.formInput('OneToManyInline', 'OneToMany', {
 			input.val(text);
 		});
 		
+		scope.$watch('schema.loaded', function(viewLoaded) {
+			var schema = scope.schema;
+			if (schema && field.canEdit === false) {
+				schema.editIcon = false;
+			}
+		});
+		
 		scope.$on("$destroy", function(e){
 			wrapper.remove();
+			$(document).off('mousedown.mini-grid', hidePopup);
 		});
+
+		scope.canEdit = function () {
+			return scope.hasPermission('create') && !scope.isReadonly() && field.canEdit !== false;
+		};
+		
+		scope.canRemove = function() {
+			return scope.hasPermission('create') && !scope.isReadonly() && field.canEdit !== false;
+		};
 	},
 	
 	template_editable: null,
@@ -739,8 +780,8 @@ ui.formInput('OneToManyInline', 'OneToMany', {
 	'<span class="picker-input picker-icons-2" style="position: absolute;">'+
 		'<input type="text" readonly>'+
 		'<span class="picker-icons">'+
-			'<i class="icon-plus" ng-click="onNew()" ng-show="hasPermission(\'create\')" title="{{\'Select\' | t}}"></i>'+
-			'<i class="icon-minus" ng-click="onRemove()" ng-show="hasPermission(\'remove\')" title="{{\'Select\' | t}}"></i>'+
+			'<i class="icon-plus" ng-click="onNew()" ng-show="canEdit()" title="{{\'Select\' | t}}"></i>'+
+			'<i class="icon-minus" ng-click="onRemove()" ng-show="canRemove()" title="{{\'Select\' | t}}"></i>'+
 		'</span>'+
 		'<div ui-view-grid ' +
 			'x-view="schema" '+

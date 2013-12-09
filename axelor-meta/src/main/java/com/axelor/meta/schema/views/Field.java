@@ -89,9 +89,6 @@ public class Field extends SimpleWidget {
 	@XmlAttribute
 	private String validIf;
 
-	@XmlAttribute
-	private Integer width;
-
 	@XmlAttribute(name = "min")
 	private String minSize;
 
@@ -125,7 +122,8 @@ public class Field extends SimpleWidget {
 	@XmlAttribute(name = "summary-view")
 	private String summaryView;
 
-	private Hilite hilite;
+	@XmlElement(name = "hilite")
+	private List<Hilite> hilites;
 
 	@XmlElements({
 		@XmlElement(name = "form", type = FormView.class),
@@ -260,14 +258,6 @@ public class Field extends SimpleWidget {
 		this.validIf = validIf;
 	}
 
-	public Integer getWidth() {
-		return width;
-	}
-
-	public void setWidth(Integer width) {
-		this.width = width;
-	}
-
 	@JsonIgnore
 	public String getSelection() {
 		return selection;
@@ -305,12 +295,12 @@ public class Field extends SimpleWidget {
 		this.aggregate = aggregate;
 	}
 
-	public Hilite getHilite() {
-		return hilite;
+	public List<Hilite> getHilites() {
+		return hilites;
 	}
 
-	public void setHilite(Hilite hilite) {
-		this.hilite = hilite;
+	public void setHilites(List<Hilite> hilites) {
+		this.hilites = hilites;
 	}
 
 	public List<AbstractView> getViews() {

@@ -37,6 +37,9 @@ import com.axelor.meta.service.MetaModelService;
 import com.axelor.wkf.db.Node;
 import com.axelor.wkf.db.Transition;
 import com.axelor.wkf.db.Workflow;
+import com.axelor.wkf.db.node.EndEvent;
+import com.axelor.wkf.db.node.StartEvent;
+import com.axelor.wkf.db.node.NodeTask;
 
 public class CreateData {
 
@@ -88,47 +91,53 @@ public class CreateData {
 		metaAction6.setXml("<action-group name=\"action-test-6\" ><action name=\"action-test-3\"/><action name=\"action-test-4\"/><action name=\"save\"/></action-group>");
 		metaAction6.setType("action-group");
 		
-		Node node1 = new Node();
-		node1.setName("Node 1");
-		node1.setType("start");
-		node1.setStartTransitions(new ArrayList<Transition>());
-		node1.addEndTransition(startTransition);
+		MetaAction metaCondition = new MetaAction();
+		metaCondition.setName("action-condition");
+		metaCondition.setXml("<action-condition name=\"action-condition\" ><check field=\"archived\" if=\"archived\" error=\"This is an error !\"/></action-condition>");
+		metaCondition.setType("action-condition");
+		metaCondition.save();
 		
-		Node node2 = new Node();
-		node2.setName("Node 2");
-		node2.setType("intermediary");
-		node2.setAction( metaAction5 );
-		node2.addStartTransition(startTransition);
-		node2.addEndTransition(intermediaryTransition);
+		Node start = new StartEvent();
+		start.setName("Start");
+		start.setType("startEvent");
+		start.setStartTransitions(new ArrayList<Transition>());
+		start.addEndTransition(startTransition);
 		
-		Node node3 = new Node();
-		node3.setName("Node 3");
-		node3.setType("intermediary");
-		node3.setAction( metaAction6 );
-		node3.addStartTransition(intermediaryTransition);
-		node3.addEndTransition(endTransition);
+		Node task1 = new NodeTask();
+		task1.setName("Task 1");
+		task1.setType("task");
+		task1.setAction( metaAction5 );
+		task1.addStartTransition(startTransition);
+		task1.addEndTransition(intermediaryTransition);
 		
-		Node node4 = new Node();
-		node4.setName("Node 2");
-		node4.setType("stop");
-		node4.setLogicOperator("and");
-		node4.addStartTransition(endTransition);
-		node4.setEndTransitions(new ArrayList<Transition>());
+		Node task2 = new NodeTask();
+		task2.setName("Task 2");
+		task2.setType("task");
+		task2.setAction( metaAction6 );
+		task2.addStartTransition(intermediaryTransition);
+		task2.addEndTransition(endTransition);
 		
-		startTransition.setStartNode(node1);
-		startTransition.setNextNode(node2);
+		Node stop = new EndEvent();
+		stop.setName("End");
+		stop.setType("endEvent");
+		stop.addStartTransition(endTransition);
+		stop.setEndTransitions(new ArrayList<Transition>());
 		
-		intermediaryTransition.setStartNode(node2);
-		intermediaryTransition.setNextNode(node3);
+		startTransition.setStartNode(start);
+		startTransition.setNextNode(task1);
 		
-		endTransition.setStartNode(node3);
-		endTransition.setNextNode(node4);
+		intermediaryTransition.setStartNode(task1);
+		intermediaryTransition.setCondition(metaCondition);
+		intermediaryTransition.setNextNode(task2);
+		
+		endTransition.setStartNode(task2);
+		endTransition.setNextNode(stop);
 		
 		Workflow workflow = new Workflow();
 		
 		workflow.setName("Wkf");
 		workflow.setMetaModel( MetaModelService.getMetaModel(Workflow.class) );
-		workflow.setNode(node1);
+		workflow.setNode(start);
 		workflow.setMaxNodeCounter(1);
 		
 		return workflow.save();

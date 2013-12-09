@@ -106,16 +106,23 @@ function RefFieldCtrl($scope, $element, DataSource, ViewService, initCallback) {
 	$scope.createNestedEditor = function() {
 		return null;
 	};
-	
-	$scope.showNestedEditor = function(record) {
+
+	/**
+	 * Show/Hide the nested editor according to the show parameter, if
+	 * undefined then toggle.
+	 *
+	 */
+	$scope.showNestedEditor = function showNestedEditor(show) {
 		if (!params.summaryView) {
 			return;
 		}
 		if (embedded === null) {
 			embedded = $scope.createNestedEditor();
 		}
-		if (embedded !== null) {
-			embedded.toggle();
+		var es = embedded.data('$scope');
+		if (es !== null) {
+			es.visible = (show === undefined ? !es.visible : show);
+			embedded.toggle(es.visible);
 		}
 		return embedded;
 	};
@@ -130,11 +137,11 @@ function RefFieldCtrl($scope, $element, DataSource, ViewService, initCallback) {
 		}
 		
 		var popup = editor.data('$scope');
-		popup.show();
-		popup.edit(record);
+		popup.show(record);
 		if (record == null) {
 			popup.ajaxStop(function() {
 				popup.$broadcast("on:new");
+				popup.applyLater();
 			});
 		}
 	};

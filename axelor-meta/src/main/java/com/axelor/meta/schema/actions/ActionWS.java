@@ -104,15 +104,15 @@ public class ActionWS extends Action {
 		return (ActionWS) ref;
 	}
 
-	private Object send(String location, Method method, ActionHandler handler)
+	private Object send(String location, String template, ActionHandler handler)
 			throws IOException, FileNotFoundException, ClassNotFoundException {
 
-		File template = new File(method.template);
-		if (!template.isFile()) {
-			throw new IllegalArgumentException("No such template: " + method.template);
+		File templateFile = new File(template);
+		if (!templateFile.isFile()) {
+			throw new IllegalArgumentException("No such template: " + template);
 		}
 
-		String payload = handler.template(template);
+		String payload = handler.template(templateFile);
 		Map<String, Object> params = Maps.newHashMap();
 
 		params.put("connectTimeout", getConnectTimeout() * 1000);
@@ -127,11 +127,23 @@ public class ActionWS extends Action {
 		return TemplateHelper.serialize(gpath);
 	}
 
+	private String getService(ActionWS ref, ActionHandler handler) {
+		String url = ref == null ? service : ref.getService();
+		Object service = handler.evaluate(url);
+
+		if(service == null) {
+			log.error("No such service: " + url);
+			return null;
+		}
+
+		return service.toString();
+	}
+
 	@Override
 	public Object evaluate(ActionHandler handler) {
 
 		ActionWS ref = getRef();
-		String url = ref == null ? service : ref.getService();
+		String url = getService(ref, handler);
 
 		if (Strings.isNullOrEmpty(url))
 			return null;
@@ -143,9 +155,14 @@ public class ActionWS extends Action {
 		List<Object> result = Lists.newArrayList();
 		log.info("action-ws (name): " + getName());
 		for(Method m : methods) {
-			log.info("action-ws (method, template): " + m.getName() + ", " + m.template);
+			Object template = handler.evaluate(m.template);
+			if(template == null) {
+				log.error("No such template: " + m.template);
+				continue;
+			}
+			log.info("action-ws (method, template): " + m.getName() + ", " + template.toString());
 			try {
-				Object res = this.send(url, m, handler);
+				Object res = this.send(url, template.toString(), handler);
 				result.add(res);
 			} catch (Exception e) {
 				log.error("error: " + e);

@@ -226,6 +226,12 @@ function FilterFormCtrl($scope, $element, ViewService) {
 	$scope.fields = {};
 	$scope.filters = [{}];
 	$scope.operator = 'and';
+	$scope.showArchived = false;
+
+	var handler = $scope.$parent.handler;
+	if (handler && handler._dataSource) {
+		$scope.showArchived = handler._dataSource._showArchived;
+	}
 
 	$scope.addFilter = function(filter) {
 		$scope.filters.push(filter || {});
@@ -313,6 +319,7 @@ function FilterFormCtrl($scope, $element, ViewService) {
 	$scope.prepareFilter = function() {
 
 		var criteria = {
+			archived: $scope.showArchived,
 			operator: $scope.operator,
 			criteria: []
 		};
@@ -375,6 +382,14 @@ function FilterFormCtrl($scope, $element, ViewService) {
 			$scope.$parent.$broadcast('on:hide-menu');
 		}
 	};
+	
+	$scope.canExport = function() {
+		var handler = $scope.$parent.handler;
+		if (handler && handler.hasPermission) {
+			return handler.hasPermission('export');
+		}
+		return true;
+	};
 }
 
 ui.directive('uiFilterForm', function() {
@@ -402,12 +417,17 @@ ui.directive('uiFilterForm', function() {
 				"<label class='radio inline'>" +
 					"<input type='radio' name='operator' ng-model='operator' value='or' x-translate><span x-translate>or</span>" +
 				"</label>" +
+				"<label class='checkbox inline show-archived'>" +
+					"<input type='checkbox' ng-model='showArchived'><span x-translate>Show archived</span>" +
+				"</label>" +
 			"</form>" +
 			"<div ng-repeat='filter in filters' ui-filter-item x-fields='fields' x-filter='filter'></div>" +
 			"<div class='links'>"+
 				"<a href='' ng-click='addFilter()' x-translate>Add filter</a>"+
 				"<span class='divider'>|</span>"+
 				"<a href='' ng-click='clearFilter()' x-translate>Clear</a></li>"+
+				"<span class='divider' ng-if='canExport()'>|</span>"+
+				"<a href='' ng-if='canExport()' ui-grid-export x-translate>Export</a></li>"+
 				"<span class='divider'>|</span>"+
 				"<a href='' ng-click='applyFilter(true)' x-translate>Apply</a></li>"+
 			"<div>"+
@@ -429,6 +449,7 @@ ui.directive('uiFilterBox', function() {
 			var filterView = params ? params['search-filters'] : null;
 			var filterDS = DataSource.create('com.axelor.meta.db.MetaFilter');
 
+			this.$scope = $scope;
 			$scope.model = handler._model;
 			$scope.view = {};
 
@@ -770,10 +791,14 @@ ui.directive('uiFilterBox', function() {
 					of: element
 				});
 				$(document).on('mousedown.search-menu', onMouseDown);
+				
+				scope.applyLater(function () {
+					scope.visible = true;
+				});
 			};
-
+			
 			// append menu to view page to overlap the view
-			setTimeout(function() {
+			scope.$timeout(function() {
 				element.parents('.view-container').after(menu);
 			});
 
@@ -789,6 +814,9 @@ ui.directive('uiFilterBox', function() {
 
 			function hideMenu() {
 				$(document).off('mousedown.search-menu', onMouseDown);
+				scope.applyLater(function () {
+					scope.visible = false;
+				});
 				return menu.hide();
 			}
 
@@ -822,7 +850,7 @@ ui.directive('uiFilterBox', function() {
 				"<i ng-click='onSearch($event)' class='icon-caret-down'></i>"+
 				"<i ng-click='onRefresh()' class='icon-search'></i>" +
 			"</span>" +
-			"<div class='filter-menu'>"+
+			"<div class='filter-menu' ui-watch-if='visible'>"+
 				"<div class='filter-list'>" +
 					"<dl ng-show='hasFilters(1)'>" +
 						"<dt><i class='icon-save'></i><span x-translate> Filters</span></dt>" +

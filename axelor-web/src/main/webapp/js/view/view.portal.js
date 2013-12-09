@@ -38,12 +38,10 @@ function PortalCtrl($scope, $element) {
 	var view = $scope._views['portal'];
 	var viewPromise = $scope.loadView('portal', view.name);
 
-	setTimeout(function(){
-		$scope.$apply(function(){
-			if (view.deferred)
-				view.deferred.resolve($scope);
-		});
-	});
+	$scope.applyLater(function(){
+		if (view.deferred)
+			view.deferred.resolve($scope);
+	}, 0);
 
 	viewPromise.success(function(fields, schema){
 		$scope.parse(schema);
@@ -196,7 +194,7 @@ ui.directive('uiViewPortlet', ['$compile', function($compile){
 				e.toggleClass('icon-chevron-up icon-chevron-down');
 				element.toggleClass('portlet-minimized');
 				if (e.hasClass('icon-chevron-up')) {
-					$.event.trigger('adjustSize');
+					axelor.$adjustSize();
 				}
 			};
 			

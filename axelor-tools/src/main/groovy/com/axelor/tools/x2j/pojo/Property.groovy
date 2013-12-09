@@ -281,6 +281,10 @@ class Property {
 		return attrs["orphan"] == "true"
 	}
 
+	boolean isPassword() {
+		return attrs["password"] == "true"
+	}
+
 	boolean isUnique() {
 		return attrs["unique"] == "true"
 	}
@@ -521,12 +525,13 @@ class Property {
 		def multiline = attrs['multiline']
 		def selection = attrs['selection']
 		def image = attrs['image']
+		def password = attrs['password']
 
 		if (selection) {
 			selection = selection.replaceAll("\\],\\s*\\[", '], [')
 		}
 
-		if (title || help || readonly || hidden || multiline || selection || image)
+		if (title || help || readonly || hidden || multiline || selection || image || isPassword())
 			annon("com.axelor.db.annotations.Widget")
 				.add("image", image, false)
 				.add("title", title)
@@ -536,6 +541,7 @@ class Property {
 				.add("multiline", multiline, false)
 				.add("search", search, true, true)
 				.add("selection", selection)
+				.add("password", password, false)
 	}
 
 	private List<Annotation> $binary() {
@@ -561,9 +567,8 @@ class Property {
 	private Annotation $index() {
 		if (!this.isIndexable()) return null
 		String index = attrs['index'] as String
-		if (index && !index.startsWith('idx_'))
+		if (!index || index == 'true' || index.trim().empty)
 			index = "${entity.table}_${columnAuto}_IDX".toUpperCase()
-		if (!index) return null
 		return annon("org.hibernate.annotations.Index").add("name", index)
 	}
 

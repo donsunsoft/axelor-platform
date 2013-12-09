@@ -89,7 +89,7 @@ ui.directive('uiHelpPopover', function() {
 		}
 
 		var value = scope.$eval('$$original.' + field.name);
-		if (value && field.type === 'many-to-one') {
+		if (value && /-one$/.test(field.serverType)) {
 			value = value.id;
 		}
 		if (value && field.type === "password") {
@@ -103,7 +103,7 @@ ui.directive('uiHelpPopover', function() {
 			}
 			value = value.join('');
 		}
-		if (value && /-many$/.test(field.type)) {
+		if (value && /-many$/.test(field.serverType)) {
 			var length = value.length;
 			value = _.first(value, 5);
 			value = _.map(value, function(v){
@@ -265,21 +265,28 @@ ui.formItem('Button', {
 		}
 
 		element.on("click", function(e) {
-			if (!scope.attr('readonly')) {
+			if (!scope.isReadonlyExclusive()) {
 				scope.fireAction("onClick");
 			}
 		});
 		
-		scope.$watch('attr("readonly")', function(readonly, old) {
-			if (readonly === old) return;
+		var readonlySet = false;
+		scope.$watch('isReadonlyExclusive()', function(readonly, old) {
+			if (readonly === old && readonlySet) return;
+			readonlySet = true;
 			if (readonly) {
-				return element.addClass("disabled");
+				return element.addClass("disabled").attr('tabindex', -1);
 			}
-			return element.removeClass("disabled");
+			return element.removeClass("disabled").removeAttr('tabindex');
+		});
+		
+		scope.$watch('attr("title")', function(title, old) {
+			if (!title || title === old) return;
+			element.children('.btn-text').html(title);
 		});
 	},
 	template: '<a href="" class="btn">'+
-		'<span ng-transclude></span>'+
+		'<span class="btn-text" ng-transclude></span>'+
 	'</a>'
 });
 
@@ -301,17 +308,23 @@ ui.formItem('ToolButton', 'Button', {
 		scope.btn.isHidden = function() {
 			return scope.isHidden();
 		};
-
-		scope.$watch("isHidden()", function(hidden, old) {
-			setTimeout(function() {
-				element.parent().children().removeClass('btn-fix-left btn-fix-right');
-				element.parent().children(':visible:first').addClass('btn-fix-left');
-				element.parent().children(':visible:last').addClass('btn-fix-right');
-			});
-		});
 	},
 
-	template: '<button class="btn" name="{{btn.name}}" ui-actions ui-widget-states>{{title}}</button>'
+	template: '<button class="btn" ui-show="!isHidden()" name="{{btn.name}}" ui-actions ui-widget-states>{{title}}</button>'
+});
+
+ui.directive('uiBtnGroupHelper', function () {
+	
+	return function (scope, element, attrs) {
+		if (!element.is('.btn-group')) {
+			return;
+		}
+		scope.$watch(function() {
+			element.children().removeClass('btn-fix-left btn-fix-right');
+			element.children(':not(.ui-hide):first').addClass('btn-fix-left');
+			element.children(':not(.ui-hide):last').addClass('btn-fix-right');
+		});
+	};
 });
 
 })(this);

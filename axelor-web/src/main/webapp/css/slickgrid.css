@@ -58,6 +58,12 @@
 	border-color: rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.1) rgba(0, 0, 0, 0.25);
 }
 
+.slickgrid-empty .slick-header,
+.slickgrid-empty .slick-headerrow {
+	height: 0;
+	border-bottom: none;
+}
+
 .slickgrid .slick-cell,
 .slickgrid .slick-header-column {
 	-webkit-box-sizing: content-box;
@@ -185,6 +191,11 @@
 	min-width: 250px;
 }
 
+.ui-dialog .slick-editor-dropdown .slickgrid {
+	position: relative;
+	top: 0; right: 0; border: 0; left: 0;
+}
+
 .slick-cell.dirty {
 	background-image: url('../img/dirty.gif');
 	background-position: 0 0;
@@ -204,6 +215,12 @@
 
 .slick-cell.button img {
 	cursor: pointer;
+}
+
+.slick-cell.button .disabled {
+	outline: none;
+	opacity: 0.45;
+	cursor: inherit;
 }
 
 .slick-cell.button,
