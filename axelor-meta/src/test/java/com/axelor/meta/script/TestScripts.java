@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.meta.script;
 
@@ -41,8 +41,10 @@ import com.axelor.rpc.Context;
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class TestScripts extends BaseTest {
 
+	private int counter = 0;
+
     @Test
-    public void test02_casts() {
+    public void test01_casts() {
 
     	GroovyScriptHelper helper = new GroovyScriptHelper(context());
 
@@ -60,5 +62,14 @@ public class TestScripts extends BaseTest {
     	actual = helper.eval("(__ref__ as Contact).fullName");
     	Assert.assertTrue(actual instanceof String);
     	Assert.assertEquals("John Smith", actual);
+
+    	actual = helper.eval("(__ref__ as Contact).fullName + ' (" + counter + ")'");
+    }
+
+    //@Test
+    public void test02_permgen() {
+    	while (counter++ < 5000) {
+    		test01_casts();
+    	}
     }
 }

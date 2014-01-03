@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.meta.schema.actions;
 
@@ -72,12 +72,12 @@ public class ActionGroup extends Action {
 		this.actions.add(item);
 	}
 
-	private String getPending(Iterator<ActionItem> actions) {
-		List<String> pending = Lists.newArrayList();
-    	while(actions.hasNext()) {
+	private String getPending(Iterator<ActionItem> actions, String... prepend) {
+		final List<String> pending = Lists.newArrayList(prepend);
+		while(actions.hasNext()) {
     		pending.add(actions.next().getName());
     	}
-    	return Joiner.on(",").join(pending);
+    	return Joiner.on(",").skipNulls().join(pending);
 	}
 
 	private Action findAction(String name) {
@@ -107,6 +107,17 @@ public class ActionGroup extends Action {
 				((ActionMethod) action).setCall(method);
 			}
 			return action;
+		} else if (actionName.indexOf("[") > -1 && actionName.endsWith("]")) {
+				String idx = actionName.substring(actionName.lastIndexOf('[') + 1, actionName.lastIndexOf(']'));
+				actionName = actionName.substring(0, actionName.lastIndexOf('['));
+				int index = Integer.parseInt(idx);
+				log.debug("continue action-validate: {}", actionName);
+				log.debug("continue at: {}", index);
+				Action action = MetaStore.getAction(actionName);
+				if (action instanceof ActionValidate) {
+					((ActionValidate) action).setIndex(index);
+				}
+				return action;
 		}
 
 		return MetaStore.getAction(actionName);
@@ -189,16 +200,33 @@ public class ActionGroup extends Action {
             log.debug("action complete: {}", name);
 
             if (action instanceof ActionValidate && value instanceof Map) {
-            	String pending = iter.hasNext() ? this.getPending(iter) : null;
+            	String validate = (String) ((Map) value).get("pending");
+            	String pending = this.getPending(iter, validate);
             	log.debug("wait for validation: {}, {}", name, value);
             	log.debug("pending actions: {}", pending);
-				((Map<String, Object>) value).put("pending", pending);
+            	((Map<String, Object>) value).put("pending", pending);
                 break;
             }
 
             if (action instanceof ActionCondition) {
             	if (value instanceof Map || Objects.equal(value, Boolean.FALSE)) {
                 	break;
+            	}
+            }
+
+            if (action instanceof ActionGroup && !result.isEmpty() && iter.hasNext()) {
+            	Map<String, Object> last = null;
+            	try {
+            		last = (Map) result.get(result.size() - 1);
+            	} catch (ClassCastException e) {
+            	}
+            	if (last != null && (last.containsKey("alert") || last.containsKey("error"))) {
+            		String previous = (String) last.get("pending");
+            		String pending = this.getPending(iter, previous);
+            		last.put("pending", pending);
+            		log.debug("wait for group validation: {}", action.getName());
+            		log.debug("pending actions: {}", pending);
+            		break;
             	}
             }
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 _t.calendar = {
 	monthNames: ['Janvier','Février','Mars','Avril','Mai','Juin', 'Juillet','Août','Septembre','Octobre','Novembre','Décembre'],
@@ -50,6 +50,8 @@ _t.put({
 "Action": "Action",
 "Action Category": "Catégorie",
 "Action Sub-Category": "Sous catégorie",
+"Add": "Ajouter",
+"Advanced Search": "Recherche avancée",
 "All Day": "Toute la journée",
 "Archived": "Archive",
 "Back": "Retour",
@@ -64,6 +66,7 @@ _t.put({
 "Day": "Journée",
 "Delete": "Supprimer",
 "Do you really want to delete the selected record(s)?": "Etes-vous sûr de vouloir désélectionner ce(s) enregistrement(s) ?",
+"Do you really want to update all {0} records?": "Etes-vous sûr de vouloir mettre à jour ces {0} enregistrement(s) ?",
 "Download": "Télécharger",
 "Edit": "Editer",
 "Edit event": "Editer évènement",
@@ -108,6 +111,9 @@ _t.put({
 "Orig. Value": "Valeur orig.",
 "Created On:": "Crée le:",
 "Created By:": "Crée par:",
+"Update": "Mettre à jour",
+"Update all": "Tous mettre à jour",
+"Mass Update": "Mise à jour en masse",
 "Updated On:": "Mise à jour le:",
 "Updated By:": "Mise à jour par:",
 "Update Log": "Modifications",

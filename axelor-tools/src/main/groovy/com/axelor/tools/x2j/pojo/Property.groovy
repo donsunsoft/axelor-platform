@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.tools.x2j.pojo
 
@@ -526,12 +526,17 @@ class Property {
 		def selection = attrs['selection']
 		def image = attrs['image']
 		def password = attrs['password']
+		def massUpdate = attrs['massUpdate']
+
+		if (massUpdate && (isUnique() || isCollection() || attrs['large'])) {
+			massUpdate = false;
+		}
 
 		if (selection) {
 			selection = selection.replaceAll("\\],\\s*\\[", '], [')
 		}
 
-		if (title || help || readonly || hidden || multiline || selection || image || isPassword())
+		if (title || help || readonly || hidden || multiline || selection || image || isPassword() || massUpdate)
 			annon("com.axelor.db.annotations.Widget")
 				.add("image", image, false)
 				.add("title", title)
@@ -542,6 +547,7 @@ class Property {
 				.add("search", search, true, true)
 				.add("selection", selection)
 				.add("password", password, false)
+				.add("massUpdate", massUpdate, false)
 	}
 
 	private List<Annotation> $binary() {

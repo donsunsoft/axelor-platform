@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.meta.schema.actions;
 
@@ -80,12 +80,27 @@ public class ActionValidate extends Action {
 	public static class Alert extends Validator {
 	}
 
+	private static final ThreadLocal<Integer> INDEX = new ThreadLocal<Integer>();
+
 	@JsonIgnore
 	@XmlElements({
 		@XmlElement(name = "error", type = Error.class),
 		@XmlElement(name = "alert", type = Alert.class),
 	})
 	private List<Validator> validators;
+
+	public void setIndex(int index) {
+		INDEX.set(index);
+	}
+
+	public int getIndex() {
+		final Integer n = INDEX.get();
+		if (n == null) {
+			return 0;
+		}
+		INDEX.remove();
+		return n;
+	}
 
 	public List<Validator> getValidators() {
 		return validators;
@@ -97,21 +112,32 @@ public class ActionValidate extends Action {
 
 	@Override
 	public Object evaluate(ActionHandler handler) {
-		for(Validator validator : validators) {
-			if (validator.test(handler)) {
-				String key = validator.getClass().getSimpleName().toLowerCase();
-				String val = JPA.translate(validator.getMessage(), validator.getMessage(), null, "action");
 
-				if (!Strings.isNullOrEmpty(val))
-					val = handler.evaluate("eval: " + "\"\"\"" + val + "\"\"\"").toString();
+		for (int i = getIndex(); i < validators.size(); i++) {
 
-				Map<String, Object> result = Maps.newHashMap();
-				result.put(key, val);
-				if (!Strings.isNullOrEmpty(validator.getAction())) {
-					result.put("action", validator.getAction());
-				}
-				return result;
+			final Validator validator = validators.get(i);
+			if (!validator.test(handler)) {
+				continue;
 			}
+
+			String key = validator.getClass().getSimpleName().toLowerCase();
+			String val = JPA.translate(validator.getMessage(), validator.getMessage(), null, "action");
+
+			if (!Strings.isNullOrEmpty(val)) {
+				val = handler.evaluate("eval: " + "\"\"\"" + val + "\"\"\"").toString();
+			}
+
+			Map<String, Object> result = Maps.newHashMap();
+			result.put(key, val);
+			if (!Strings.isNullOrEmpty(validator.getAction())) {
+				result.put("action", validator.getAction());
+			}
+
+			if (i + 1 < validators.size() && validator instanceof Alert) {
+				result.put("pending", String.format("%s[%d]", getName(), i + 1));
+			}
+
+			return result;
 		}
 		return null;
 	}

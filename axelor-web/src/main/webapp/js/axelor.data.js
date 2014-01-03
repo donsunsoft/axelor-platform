@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 (function($, undefined) {
 
@@ -95,6 +95,10 @@
 						return $http.post(url, data, config);
 					}
 				};
+			},
+			
+			_new: function(model, options) {
+				return new DataSource(model, options);
 			},
 			
 			on: function(name, listener) {
@@ -231,7 +235,7 @@
 				var limit = opts.limit == undefined ? this._page.limit : opts.limit;
 				var offset = opts.offset == undefined ? this._page.from : opts.offset;
 				var domain = opts.domain === undefined ? (this._lastDomain || this._domain) : opts.domain;
-				var context = opts.context == undefined ? this._lastContext : opts.context;
+				var context = opts.context == undefined ? (this._lastContext || this._context) : opts.context;
 				var archived = opts.archived == undefined ? this._showArchived : opts.archived;
 				
 				var fields = _.isEmpty(opts.fields) ? null : opts.fields;
@@ -302,10 +306,10 @@
 			},
 			
 			get: function(id) {
-				var i = 0;
-				while(i++ < this._data.length) {
-					if (this._data[i].id === id)
+				for (var i = 0; i < this._data.length; i++) {
+					if (this._data[i].id === id) {
 						return this._data[i];
+					}
 				}
 			},
 			
@@ -318,7 +322,7 @@
 			 * @returns promise
 			 */
 			read: function(id, options) {
-				var promise;
+				var promise, record;
 				if (options) {
 					promise = this._request('fetch', id).post({
 						fields: options.fields
@@ -326,12 +330,17 @@
 				} else {
 					promise = this._request(null, id).get();
 				}
+				
+				promise.then(function(response){
+					var res = response.data;
+					record = res.data;
+					if (isArray(record)) {
+						record = record[0];
+					}
+				});
+				
 				promise.success = function(fn){
 					promise.then(function(response){
-						var res = response.data,
-							record = res.data;
-						if (isArray(record))
-							record = record[0];
 						fn(record);
 					});
 					return promise;
@@ -462,7 +471,7 @@
 
 				var that = this,
 					page = this._page,
-					promise;
+					record, promise;
 
 				if (values && values.$upload) {
 					var upload = values.$upload;
@@ -472,15 +481,15 @@
 				promise = this._request().post({
 					data: values
 				});
+				
+				promise.then(function(response){
+					var res = response.data;
+					res.data = res.data[0];
+					record = that._accept(res);
+				});
 
 				promise.success = function(fn) {
 					promise.then(function(response){
-						var res = response.data,
-							record;
-						
-						res.data = res.data[0];
-						record = that._accept(res);
-
 						fn(record, page);
 					});
 					return promise;
@@ -502,34 +511,37 @@
 						records: items
 					});
 
-				promise.success = function(fn) {
-					promise.then(function(response){
-						var res = response.data;
-						_.each(res.data || [], function(item){
-							var found = _.find(records, function(rec){
-								if (rec.id === item.id) {
-									angular.copy(item, rec);
-									return true;
-								}
-							});
-							if (!found) {
-								records.push(item);
-								page.total += 1;
-								page.size += 1;
+				promise.then(function(response){
+					var res = response.data;
+					_.each(res.data || [], function(item){
+						var found = _.find(records, function(rec){
+							if (rec.id === item.id) {
+								angular.copy(item, rec);
+								return true;
 							}
 						});
-						
-						var i = 0;
-						while(i < records.length) {
-							var rec = records[i];
-							if (rec.id === 0) {
-								records.splice(i, 1);
-								break;
-							}
-							i ++;
+						if (!found) {
+							records.push(item);
+							page.total += 1;
+							page.size += 1;
 						}
+					});
+					
+					var i = 0;
+					while(i < records.length) {
+						var rec = records[i];
+						if (rec.id === 0) {
+							records.splice(i, 1);
+							break;
+						}
+						i ++;
+					}
 
-						that.trigger('change', records, page);
+					that.trigger('change', records, page);
+				});
+				
+				promise.success = function(fn) {
+					promise.then(function(response){
 						fn(records, page);
 					});
 					return promise;
@@ -539,6 +551,54 @@
 					return promise;
 				};
 
+				return promise;
+			},
+			
+			updateMass: function (values, ids) {
+				
+				var domain = this._lastDomain;
+				var context = this._lastContext;
+				var filter = this._filter;
+
+				var items = _.compact(ids);
+				if (items.length > 0) {
+					if (domain) {
+						domain = domain + " AND self.id IN (:__ids__)";
+					} else {
+						domain = "self.id IN (:__ids__)";
+					}
+					context = _.extend({
+						__ids__: items
+					}, context);
+				}
+				
+				var query = extend({
+					_domain: domain,
+					_domainContext: context,
+					_archived: this._showArchived
+				}, filter);
+				
+				
+				
+				var promise = this._request('updateMass').post({
+					records: [values],
+					sortBy: this._sortBy,
+					data: query
+				});
+
+				promise.success = function(fn) {
+					promise.then(function(response){
+						var res = response.data;
+						fn(res);
+					});
+					return promise;
+				};
+
+				promise.error = function(fn) {
+					promise.then(null, fn);
+					return promise;
+				};
+				
 				return promise;
 			},
 

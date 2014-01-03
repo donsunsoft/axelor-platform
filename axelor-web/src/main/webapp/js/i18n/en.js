@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,13 +26,15 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 _t.put({
 "About": "About",
 "Action": "Action",
 "Action Category": "Action Category",
 "Action Sub-Category": "Action Sub-Category",
+"Add": "Add",
+"Advanced Search": "Advanced Search",
 "All Day": "All Day",
 "Archived": "Archived",
 "Back": "Back",
@@ -45,6 +47,7 @@ _t.put({
 "Day": "Day",
 "Delete": "Delete",
 "Do you really want to delete the selected record(s)?": "Do you really want to delete the selected record(s)?",
+"Do you really want to update all {0} records?": "Do you really want to update all {0} records?",
 "Download": "Download",
 "Edit": "Edit",
 "Edit event": "Edit event",
@@ -89,6 +92,9 @@ _t.put({
 "Orig. Value": "Orig. Value",
 "Created On:": "Created On:",
 "Created By:": "Created By:",
+"Update": "Update",
+"Update all": "Update all",
+"Mass Update": "Mass Update",
 "Updated On:": "Updated On:",
 "Updated By:": "Updated By:",
 "Update Log": "Update Log",

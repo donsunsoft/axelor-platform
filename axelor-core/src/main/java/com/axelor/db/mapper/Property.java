@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.db.mapper;
 
@@ -118,6 +118,8 @@ public class Property {
 	private boolean virtual;
 
 	private boolean password;
+
+	private boolean massUpdate;
 
 	private boolean nameColumn;
 
@@ -244,6 +246,7 @@ public class Property {
 				nameSearch = w.search();
 				selection = w.selection();
 				password = w.password();
+				massUpdate = w.massUpdate();
 
 				if (w.multiline() && type == PropertyType.STRING) {
 					type = PropertyType.TEXT;
@@ -320,6 +323,13 @@ public class Property {
 
 	public boolean isPassword() {
 		return password;
+	}
+
+	public boolean isMassUpdate() {
+		if (isCollection() || isUnique()) {
+			return false;
+		}
+		return massUpdate;
 	}
 
 	public boolean isReference() {

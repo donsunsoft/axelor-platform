@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.rpc;
 
@@ -498,6 +498,31 @@ public class Resource<T extends Model> {
 		}
 
 		response.setData(data);
+		response.setStatus(Response.STATUS_SUCCESS);
+
+		return response;
+	}
+
+	@Transactional
+	public Response updateMass(Request request) {
+
+		security.get().check(JpaSecurity.CAN_WRITE, model);
+
+		LOG.debug("Mass update '{}' with {}", model.getCanonicalName(), request.getData());
+
+		Response response = new Response();
+
+		Query<?> query = getQuery(request);
+		List<?> data = request.getRecords();
+
+		LOG.debug("JPQL: {}", query);
+
+		@SuppressWarnings("all")
+		Map<String, Object> values = (Map) data.get(0);
+		response.setTotal(query.update(values));
+
+		LOG.debug("Records updated: {}", response.getTotal());
+
 		response.setStatus(Response.STATUS_SUCCESS);
 
 		return response;

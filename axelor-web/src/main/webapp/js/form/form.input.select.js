@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 (function(){
 
@@ -160,6 +160,36 @@ ui.formWidget('BaseSelect', {
 	'</span>'
 });
 
+function filterSelection(scope, field, selection, current) {
+	if (_.isEmpty(selection)) return selection;
+	if (_.isEmpty(field.selectionIn)) return selection;
+	
+	var context = (scope.getContext || angular.noop)() || {};
+	var expr = field.selectionIn.trim();
+	if (expr.indexOf('[') !== 0) {
+		expr = '[' + expr + ']';
+	}
+
+	function conv(v) {
+		if (v === null || v === undefined) return v;
+		return '' + v;
+	}
+	
+	var list = axelor.$eval(scope, expr, context);
+	var value = conv(current);
+	
+	if (_.isEmpty(list)) {
+		return selection;
+	}
+	
+	list = _.map(list, conv);
+	
+	return _.filter(selection, function (item) {
+		var val = conv(item.value);
+		return val === value || list.indexOf(val) > -1;
+	});
+}
+
 ui.formInput('Select', 'BaseSelect', {
 
 	css: 'select-item',
@@ -170,14 +200,10 @@ ui.formInput('Select', 'BaseSelect', {
 		this._super(scope);
 
 		var field = scope.field,
-			selection = field.selection || [],
+			selectionList = field.selectionList || [],
 			selectionMap = {};
 		
-		if (_.isArray(field.selection)) {
-			selection = field.selection;
-		}
-
-		var data = _.map(selection, function(item) {
+		var data = _.map(selectionList, function(item) {
 			var value = "" + item.value;
 			selectionMap[value] = item.title;
 			return {
@@ -185,14 +211,46 @@ ui.formInput('Select', 'BaseSelect', {
 				label: item.title || "&nbsp;"
 			};
 		});
-
-		scope.loadSelection = function(request, response) {
-			var items = _.filter(data, function(item) {
-				var label = item.label || "",
-					term = request.term || "";
-				return label.toLowerCase().indexOf(term.toLowerCase()) > -1;
+	
+		var dataSource = null;
+		function getDataSource() {
+			if (dataSource || !field.selection || !field.domain) {
+				return dataSource;
+			}
+			return dataSource = scope._dataSource._new('com.axelor.meta.db.MetaSelectItem', {
+				domain: "(self.select.name = :_select) AND (" + field.domain + ")",
+				context: {
+					_select: field.selection
+				}
 			});
-			response(items);
+		}
+		
+		scope.loadSelection = function(request, response) {
+			
+			var  ds = getDataSource();
+			
+			function select(records) {
+				var items = _.filter(records, function(item) {
+					var label = item.label || "",
+						term = request.term || "";
+					return label.toLowerCase().indexOf(term.toLowerCase()) > -1;
+				});
+				items = filterSelection(scope, field, items);
+				return response(items);
+			}
+			
+			if (ds) {
+				return ds.search({
+					fields: ['value', 'title'],
+					context: scope.getContext ? scope.getContext() : undefined
+				}).success(function (records) {
+					_.each(records, function (item) {
+						item.label = selectionMap[item.value] || item.title;
+					});
+					return select(records);
+				});
+			}
+			return select(data);
 		};
 
 		scope.formatItem = function(item) {
@@ -517,13 +575,12 @@ ui.formInput('RadioSelect', {
 	
 	link: function(scope, element, attrs, model) {
 		
-		var field = scope.field,
-			selection = [];
-	
-		if (_.isArray(field.selection)) {
-			selection = field.selection;
-		}
-		scope.selection = selection;
+		var field = scope.field;
+		var selection = field.selectionList || [];
+		
+		scope.getSelection = function () {
+			return filterSelection(scope, field, selection, scope.getValue());
+		};
 
 		element.on("change", ":input", function(e) {
 			scope.setValue($(e.target).val(), true);
@@ -540,7 +597,7 @@ ui.formInput('RadioSelect', {
 	template_readonly: null,
 	template:
 	'<ul ng-class="{ readonly: isReadonly() }">'+
-		'<li ng-repeat="select in selection">'+
+		'<li ng-repeat="select in getSelection()">'+
 		'<label>'+
 			'<input type="radio" name="radio_{{$parent.$id}}" value="{{select.value}}"'+
 			' ng-disabled="isReadonly()"'+
@@ -556,13 +613,12 @@ ui.formInput('NavSelect', {
 	
 	link: function(scope, element, attrs, model) {
 		
-		var field = scope.field,
-			selection = [];
-	
-		if (_.isArray(field.selection)) {
-			selection = field.selection;
-		}
-		scope.selection = selection;
+		var field = scope.field;
+		var selection = field.selectionList || [];
+
+		scope.getSelection = function () {
+			return filterSelection(scope, field, selection, scope.getValue());
+		};
 		
 		scope.onSelect = function(select) {
 			if (scope.attr('readonly')) {
@@ -581,7 +637,7 @@ ui.formInput('NavSelect', {
 	template:
 	'<div class="nav-select">'+
 	'<ul class="steps">'+
-		'<li ng-repeat="select in selection" ng-class="{ active: getValue() == select.value }">'+
+		'<li ng-repeat="select in getSelection()" ng-class="{ active: getValue() == select.value }">'+
 			'<a href="" tabindex="-1" ng-click="onSelect(select)">{{select.title}}</a>'+
 		'</li>'+
 		'<li></li>'+

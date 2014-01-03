@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 /* FORM VIEW */
 
@@ -198,6 +198,7 @@ table.form-layout td.form-item.v-align-top {
 	margin-top: 4px !important;
 }
 
+.form-item > a.btn,
 .form-item-container button {
 	padding: 2px 10px 2px;
 	min-width: 26px;
@@ -858,8 +859,8 @@ table.field-details .help-text hr {
 	background: #fff !important;
 	width: auto !important;
 	border: none  !important;
-	
 	padding: 2px !important;
+	height: inherit !important;
 }
 
 .button-item.img-button:hover img {
@@ -927,6 +928,7 @@ table.field-details .help-text hr {
 	color: black;
 }
 
+.update-menu,
 .filter-menu {
 
 	display: none;
@@ -938,8 +940,14 @@ table.field-details .help-text hr {
 	background: #fff;
 	
 	border-radius: 4px;
-	
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+
 	z-index: 11;
+}
+
+.filter-menu hr {
+	margin: 8px 0;
 }
 
 .filter-menu .filter-list {
@@ -950,6 +958,14 @@ table.field-details .help-text hr {
 	display: table-cell;
 	width: 50%;
 	padding-right: 40px;
+}
+
+.filter-menu .filter-list > dl dt {
+	padding-bottom: 4px;
+}
+
+.filter-menu .filter-list > dl dt i {
+	margin-right: 2px;
 }
 
 .filter-menu .filter-list > dl dd {
@@ -972,11 +988,62 @@ table.field-details .help-text hr {
 .filter-menu input[type=radio],
 .filter-menu input[type=checkbox] {
 	margin-top: 3px;
+	min-width: initial;
 }
 
 .filter-menu .show-archived {
 	margin-left: 26px;
 }
+
+.filter-form .form-layout .form-item > input,
+.filter-form .form-layout .form-item > .form-item-container {
+	width: auto;
+	min-width: inherit;
+	max-width: 170px;
+}
+
+.filter-form .form-layout .form-item > input {
+	height: 26px;
+}
+
+.filter-form .form-layout .form-item.filter-select {
+	width: 170px;
+	min-width: 170px;
+}
+
+.filter-form .form-layout .form-item select {
+	height: 26px;
+	line-height: 26px;
+	
+	padding: inherit;
+}
+
+.filter-form .form-layout .filter-remove {
+	width: 16px;
+	min-width: 16px;
+	max-width: 16px;
+	padding-top: 5px;
+	vertical-align: top;
+}
+
+.record-toolbar button.update-menu-button {
+	padding: 4px;
+}
+
+.filter-form.update-form .form-item {
+	min-width: 170px;
+}
+
+.filter-menu.update-menu .checkbox.update-all {
+	margin-left: 8px;
+}
+
+.filter-form .links {
+	margin: 4px;
+	padding-left: 14px;
+}
+
+/* end filter/update menu */
 
 .btn-group > .btn-fix-left {
 	border-top-left-radius: 4px;

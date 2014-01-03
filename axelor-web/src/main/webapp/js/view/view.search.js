@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 SearchViewCtrl.$inject = ['$scope', '$element', '$http', 'DataSource', 'ViewService', 'MenuService'];
 function SearchViewCtrl($scope, $element, $http, DataSource, ViewService, MenuService) {
@@ -42,8 +42,11 @@ function SearchViewCtrl($scope, $element, $http, DataSource, ViewService, MenuSe
 	
 	function fixFields(fields) {
 		_.each(fields, function(field){
-			if (field.type == 'reference')
+			if (field.type == 'reference') {
 				field.type = 'MANY_TO_ONE';
+				field.canNew = false;
+				field.canEdit = false;
+			}
 			
 			if (field.type)
 				field.type = field.type.toUpperCase();
@@ -76,11 +79,14 @@ function SearchViewCtrl($scope, $element, $http, DataSource, ViewService, MenuSe
 		$scope._resultFields = fixFields(schema.resultFields);
 
 		$scope._searchView = schema;
+		$scope._showSingle = params.params && params.params._showSingle;
+		
 		$scope.updateRoute();
 		
 		if (params.options && params.options.mode == "search") {
 			$scope.setRouteOptions(params.options);
 		}
+		
 	};
 	
 	$scope.getRouteOptions = function() {
@@ -101,6 +107,9 @@ function SearchViewCtrl($scope, $element, $http, DataSource, ViewService, MenuSe
 			search = opts.search,
 			record = {};
 
+		if (!search || _.isEmpty(search)) {
+			scopes.form.$broadcast('on:new');
+		}
 		if (!search || _.isEmpty(search) || angular.equals($scope._routeSearch, search)) {
 			return $scope.updateRoute();
 		}
@@ -122,8 +131,24 @@ function SearchViewCtrl($scope, $element, $http, DataSource, ViewService, MenuSe
 			}
 		});
 		
+		if (search.objects) {
+			scopes.toolbar.editRecord({
+				objectSelect: search.objects
+			});
+		}
+		
 		scopes.form.editRecord(record);
-		$scope.doSearch();
+		
+		var promise = $scope.doSearch();
+		if (promise && promise.then && $scope._showSingle) {
+			promise.then(function () {
+				var items = scopes.grid.getItems();
+				if (items && items.length === 1) {
+					scopes.grid.selection = [0];
+					scopes.grid.onEdit();
+				}
+			});
+		}
 	};
 	
 	var scopes = {};
@@ -149,7 +174,7 @@ function SearchViewCtrl($scope, $element, $http, DataSource, ViewService, MenuSe
 			data: params
 		});
 		
-		promise.then(function(response){
+		return promise.then(function(response){
 			var res = response.data,
 				records = res.data || [];
 			
@@ -231,12 +256,48 @@ function SearchFormCtrl($scope, $element, ViewService) {
 		};
 
 		var meta = { fields: schema.searchFields };
-		ViewService.process(meta);
+		ViewService.process(meta, schema.searchForm);
+		
+		function process(item) {
+			if (item.items || item.pages) {
+				return _.each(item.items || item.pages, process);
+			}
+			switch (item.widgetName) {
+			case 'ManyToOne':
+			case 'OneToOne':
+			case 'SuggestBox':
+				item.canNew = false;
+				item.canEdit = false;
+				break;
+			case 'OneToMany':
+			case 'ManyToMany':
+			case 'MasterDetail':
+				item.hidden = true;
+			}
+		}
+		
+		if (schema.searchForm && schema.searchForm.items) {
+			_.each(schema.searchForm.items, process);
+		}
 		
 		$scope.fields = meta.fields;
-		$scope.schema = form;
+		$scope.schema = schema.searchForm || form;
 		$scope.schema.loaded = true;
 	});
+	
+	var model = null;
+	var getContext = $scope.getContext;
+	
+	$scope.getContext = function() {
+		var view = $scope._searchView || {};
+		if (model === null && view.selects) {
+			model = (_.first(view.selects) || {}).model;
+		}
+		
+		var ctx = getContext.apply(this, arguments) || {};
+		ctx._model = model;
+		return ctx;
+	};
 }
 
 SearchGridCtrl.$inject = ['$scope', '$element', 'ViewService'];
@@ -364,13 +425,18 @@ function SearchToolbarCtrl($scope, $element, $http) {
 		
 		if (schema == null)
 			return;
+		
+		var selected = [];
 
 		$scope.fields = {
 			'objectSelect' : {
 				type : 'string',
 				placeholder: _t('Search Objects'),
 				multiple : true,
-				selection : _.map(schema.selects, function(x) {
+				selectionList : _.map(schema.selects, function(x) {
+					if (x.selected) {
+						selected.push(x.model);
+					}
 					return {
 						value : x.model,
 						title : x.title
@@ -441,6 +507,14 @@ function SearchToolbarCtrl($scope, $element, $http) {
 		};
 		
 		$scope.schema.loaded = true;
+		
+		$scope.$timeout(function () {
+			var record = $scope.record || {};
+			if (selected.length > 0 && _.isEmpty(record.objectSelect)) {
+				record.objectSelect = selected.join(', ');
+				$scope.edit(record);
+			}
+		});
 	});
 }
 

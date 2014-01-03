@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.web.service;
 
@@ -61,6 +61,7 @@ import com.axelor.meta.schema.views.FormInclude;
 import com.axelor.meta.schema.views.FormView;
 import com.axelor.meta.schema.views.GridView;
 import com.axelor.meta.schema.views.Notebook;
+import com.axelor.meta.schema.views.Search;
 import com.axelor.meta.schema.views.SimpleContainer;
 import com.axelor.meta.service.MetaService;
 import com.axelor.rpc.Request;
@@ -196,6 +197,7 @@ public class ViewService extends AbstractService {
 		final Mapper mapper = Mapper.of(modelClass);
 		final List<Object> fields = Lists.newArrayList();
 
+		boolean massUpdate = false;
 
 		for(String name : names) {
 			Property p = findField(mapper, name);
@@ -203,16 +205,29 @@ public class ViewService extends AbstractService {
 				Map<String, Object> map = p.toMap();
 				map.put("name", name);
 				if (p.getSelection() != null && !"".equals(p.getSelection().trim())) {
-					map.put("selection", findSelection(p));
+					map.put("selection", p.getSelection());
+					map.put("selectionList", findSelection(p));
 				}
 				if (p.getTarget() != null) {
 					map.put("perms", perms(p.getTarget()));
+				}
+				if (p.isMassUpdate()) {
+					massUpdate = true;
 				}
 				fields.add(map);
 			}
 		}
 
-		data.put("perms", perms(modelClass));
+		Map<String, Object> perms = this.perms(modelClass);
+
+		if (massUpdate) {
+			if (perms == null) {
+				perms = Maps.newHashMap();
+			}
+			perms.put("massUpdate", massUpdate);
+		}
+
+		data.put("perms", perms);
 		data.put("fields", fields);
 
 		return data;
@@ -268,6 +283,12 @@ public class ViewService extends AbstractService {
 
 		final Map<String, Object> data = Maps.newHashMap();
 		data.put("view", view);
+
+		if (view instanceof Search && ((Search) view).getSearchForm() != null) {
+			String searchForm = ((Search) view).getSearchForm();
+			Response searchResponse = service.findView(null, searchForm, "form");
+			data.put("searchForm", searchResponse.getData());
+		}
 
 		if (view instanceof AbstractView) {
 			data.putAll(findFields(model, findNames((AbstractView) view)));

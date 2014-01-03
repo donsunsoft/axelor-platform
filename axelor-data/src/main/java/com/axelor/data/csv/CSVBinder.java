@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.data.csv;
 
@@ -246,9 +246,18 @@ public class CSVBinder {
 			LOG.trace("value: " + value);
 			LOG.trace("condition: " + cb.getCondition());
 
-			if (newBean == false && cb.getConditionEmpty() == Boolean.TRUE && p.get(bean) != null) {
-				LOG.trace("field is not empty");
-				continue;
+			if (newBean == false && cb.getConditionEmpty() == Boolean.TRUE) {
+				Object o = p.get(bean);
+				if(o != null && p.isCollection()) {
+					if(o instanceof Collection<?> && !((Collection<?>)o).isEmpty()) {
+						LOG.trace("field is not empty");
+						continue;
+					}
+				}
+				else if(o != null) {
+					LOG.trace("field is not empty");
+					continue;
+				}
 			}
 
 			if (!cb.validate(values)) {

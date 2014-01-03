@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 (function() {
 
@@ -273,17 +273,29 @@ function FormViewCtrl($scope, $element) {
 	$scope.isValid = function() {
 		return $scope.form && $scope.form.$valid;
 	};
-	
-	$scope.canCopy = function() {
-		return $scope.record && !$scope.$$dirty && $scope.record.id;
+
+	$scope.canNew = function() {
+		return $scope.hasButton('new');
+	};
+
+	$scope.canEdit = function() {
+		return $scope.hasButton('edit');
 	};
 	
 	$scope.canSave = function() {
-		return $scope.$$dirty && $scope.isValid();
+		return $scope.hasButton('save') && $scope.$$dirty && $scope.isValid();
+	};
+
+	$scope.canDelete = function() {
+		return $scope.hasButton('delete');
 	};
 	
-	$scope.canEdit = function() {
-		return !$scope.isEditable();
+	$scope.canCopy = function() {
+		return !$scope.isEditable() && $scope.hasButton('copy') && !$scope.$$dirty && ($scope.record || {}).id;
+	};
+	
+	$scope.canAttach = function() {
+		return $scope.hasButton('attach');
 	};
 
 	$scope.canCancel = function() {
@@ -475,7 +487,12 @@ function FormViewCtrl($scope, $element) {
 	$scope.reload = function() {
 		var record = $scope.record;
 		if (record && record.id) {
-			return doEdit(record.id);
+			return doEdit(record.id).success(function (rec) {
+				var shared = ds.get(record.id);
+				if (shared) {
+					shared = _.extend(shared, rec);
+				}
+			});
 		}
 		$scope.edit(null);
 		$scope.$broadcast("on:new");
@@ -633,7 +650,7 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 				attrs = angular.extend(attrs, field, this);
 				type = ui.getWidget(widget) || ui.getWidget(attrs.type) || attrs.type || 'string';
 
-				if (_.isArray(attrs.selection) && !widget) {
+				if (_.isArray(attrs.selectionList) && !widget) {
 					type = attrs.multiple ? 'multi-select' : 'select';
 				}
 
@@ -767,8 +784,7 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 		};
 		
 		scope.canShowAttachments = function() {
-			var record = scope.record || {};
-			return record.id ;
+			return scope.canAttach() && (scope.record || {}).id;
 		};
 		
 		scope.onShowAttachments = function(){
@@ -833,11 +849,6 @@ ui.directive('uiViewForm', ['$compile', 'ViewService', function($compile, ViewSe
 			
 			if (!scope._isPopup) {
 				element.addClass('has-width');
-			}
-			
-			var first = _.first(schema.items) || {};
-			if (!schema.width && !schema.colWidths && schema.cols < 4 && !first.items) {
-				schema.width = 600;
 			}
 			
 			if (schema.width) {

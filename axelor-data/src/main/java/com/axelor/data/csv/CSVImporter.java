@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.data.csv;
 
@@ -128,8 +128,27 @@ public class CSVImporter implements Importer {
 	}
 
 	public CSVImporter(Injector injector, CSVConfig config){
+		this(injector, config, null);
+	}
+
+	public CSVImporter(Injector injector, CSVConfig config, String dataDir){
+		this(injector, config, dataDir, null);
+	}
+
+	public CSVImporter(Injector injector, CSVConfig config, String dataDir, String errorDir){
+
+		if (dataDir != null) {
+			File _data = new File(dataDir);
+			Preconditions.checkNotNull(_data);
+			Preconditions.checkArgument(_data.isDirectory());
+			this.dataDir = _data;
+		}
+
 		this.config = config;
 		this.injector = injector;
+		if(!Strings.isNullOrEmpty(errorDir)) {
+			this.loggerManager = new CSVLogger(this.config, errorDir);
+		}
 	}
 
 	private List<File> getFiles(String... names) {
@@ -146,6 +165,10 @@ public class CSVImporter implements Importer {
 		} catch (Exception e) {
 		}
 		return DEFAULT_BATCH_SIZE;
+	}
+
+	public CSVLogger getLoggerManager() {
+		return loggerManager;
 	}
 
 	/**

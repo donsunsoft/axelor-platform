@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 ViewCtrl.$inject = ['$scope', 'DataSource', 'ViewService'];
 function ViewCtrl($scope, DataSource, ViewService) {
@@ -242,15 +242,44 @@ function DSViewCtrl(type, $scope, $element) {
 			$scope.onRefresh();
 		}
 	};
+	
+	var can = (function (scope) {
+		var fn = null;
+		var perms = {
+			'new': 'create',
+			'copy': 'create',
+			'edit': 'write',
+			'save': 'write',
+			'delete': 'remove',
+			'export': 'export'
+		};
+		var actions = {
+			'new': 'canNew',
+			'edit': 'canEdit',
+			'save': 'canSave',
+			'copy': 'canCopy',
+			'delete': 'canDelete',
+			'attach': 'canAttach'
+		};
 
+		function attr(which) {
+			if (fn === null && _.isFunction(scope.attr)) {
+				fn = scope.attr;
+			}
+			return !fn || fn(which) !== false;
+		}
+		
+		function perm(which) {
+			return which === undefined || scope.hasPermission(which);
+		}
+		
+		return function can(what) {
+			return attr(actions[what]) && perm(perms[what]);
+		};
+	})($scope);
+	
 	$scope.hasButton = function(name) {
-		if ((name === "new" || name === "copy") && !this.hasPermission("create")) {
-			return false;
-		}
-		if ((name === "edit" || name === "save") && !this.hasPermission("write")) {
-			return false;
-		}
-		if (name === "delete" && !this.hasPermission("remove")) {
+		if (!can(name)) {
 			return false;
 		}
 		if (_(hiddenButtons).has(name)) {
@@ -265,13 +294,14 @@ function DSViewCtrl(type, $scope, $element) {
 	
 	$scope.hasPermission = function(perm) {
 		var view = $scope.schema;
-		if (!view || !view.perms) return true;
+		var defaultValue = arguments.length === 2 ? arguments[1] : true;
+		if (!view || !view.perms) return defaultValue;
 		var perms = view.perms;
 		var permitted = perms[perm];
-		if (!permitted) {
-			return false;
+		if (permitted === undefined) {
+			return defaultValue;
 		}
-		return true;
+		return _.toBoolean(permitted);
 	};
 
 	$scope.isPermitted = function(perm, record, callback) {
@@ -321,6 +351,12 @@ angular.module('axelor.ui').directive('uiViewPane', function() {
 				$scope.viewType = type;
 				return switchTo(type, callback);
 			};
+			
+			$scope.$watch('selectedTab.viewType', function (type) {
+				if ($scope.viewType !== type && type) {
+					$scope.switchTo(type);
+				}
+			});
 
 			$scope.viewTemplate = function (type) {
 				return 'partials/views/' + type + '.html';
@@ -348,40 +384,6 @@ angular.module('axelor.ui').directive('uiViewPopup', function() {
 			$scope._isPopup = true;
 		}],
 		link: function (scope, element, attrs) {
-
-			var initialized = false,
-				width = $(window).width(),
-				height = $(window).height();
-
-			width = (60 * width / 100);
-			height = (70 * height / 100);
-
-			function adjust(how) {
-				element.find('input[type=text]:first').focus();
-				axelor.$adjustSize();
-
-				//XXX: ui-dialog issue
-				element.find('.slick-headerrow-column').zIndex(element.zIndex());
-
-				if (initialized) {
-					return;
-				}
-
-				element.dialog('option', 'width', width);
-				element.dialog('option', 'height', height);
-				
-				element.closest('.ui-dialog').position({
-			      my: "center",
-			      at: "center",
-			      of: window
-			    });
-				
-				initialized = true;
-			}
-
-			scope.onPopupOpen = function () {
-				adjust();
-			};
 			
 			var canClose = false;
 			scope.onBeforeClose = function(e) {
@@ -406,31 +408,24 @@ angular.module('axelor.ui').directive('uiViewPopup', function() {
 				}
 				scope.applyLater();
 			};
-
+			
 			scope.$watch('viewTitle', function (title) {
-				if (title) {
-					element.closest('.ui-dialog').find('.ui-dialog-title').text(title);
-				}
+				scope._setTitle(title);
 			});
 			
-			var unwatch = scope.$watch("_viewParams.$viewScope.schema", function(schema) {
-				if (initialized || !schema) {
+			var unwatch = scope.$watch("_viewParams.$viewScope.schema.loaded", function(loaded) {
+				if (!loaded) {
 					return;
 				}
 				unwatch();
-				if (schema.width) {
-					width = schema.maxWidth || schema.width;
-				}
-				setTimeout(function () {
-					scope.ajaxStop(function () {
-						element.dialog('open');
-					});
-				});
+				var viewScope = scope._viewParams.$viewScope;
+				var viewPromise = viewScope._viewPromise;
+				scope._doShow(viewPromise);
 			});
 		},
 		replace: true,
 		template:
-			'<div ui-dialog x-on-open="onPopupOpen" x-on-close="onPopupClose" x-on-ok="false" x-on-before-close="onBeforeClose">' +
+			'<div ui-dialog ui-dialog-size x-on-close="onPopupClose" x-on-ok="false" x-on-before-close="onBeforeClose">' +
 				'<div ui-view-pane="tab"></div>' +
 			'</div>'
 	};
@@ -604,7 +599,7 @@ angular.module('axelor.ui').directive('uiHotKeys', function() {
 			if (!field || field.readonly) {
 				return;
 			}
-			if (fs.hasPermission("write") && fs.isReadonly()) {
+			if (fs.hasPermission("write") && fs.isReadonly() && fs.hasButton('edit')) {
 				var elem = $(e.target),
 					parent = $(e.target).parent();
 				$.event.trigger('cancel:hot-edit');

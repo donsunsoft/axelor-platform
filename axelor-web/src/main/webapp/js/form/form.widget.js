@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 (function(){
 
@@ -99,7 +99,7 @@ ui.directive('uiTabGate', function() {
 				pre: function preLink(scope, element, attrs) {
 					scope.$watchChecker(function(current) {
 						if (current.tabSelected === undefined) {
-							return !scope.tab || scope.tab.selected;
+							return !scope.tab || scope.tab.selected === undefined || scope.tab.selected;
 						}
 						return current.tabSelected;
 					});
@@ -264,30 +264,41 @@ ui.directive('uiWidgetStates', ['$parse', function($parse) {
 		});
 	}
 	
-	function register(scope) {
-		var field = scope.field;
-		if (field == null) {
-			return;
-		}
-		
-		function handleFor(attr, conditional, negative) {
-			if (!field[conditional]) return;
+	function handleFor(scope, field, attr, conditional, negative) {
+		if (field[conditional]) {
 			handleCondition(scope, field, attr, field[conditional], negative);
 		}
-		
-		handleFor("valid", "validIf");
-		handleFor("hidden", "hideIf");
-		handleFor("hidden", "showIf", true);
-		handleFor("readonly", "readonlyIf");
-		handleFor("required", "requiredIf");
-		handleFor("collapse", "collapseIf");
-
-		handleHilites(scope, field);
-	};
-
+	}
+	
+	function handleForField(scope) {
+		var field = scope.field;
+		if (!field) return;
+		handleFor(scope, field, "valid", "validIf");
+		handleFor(scope, field, "hidden", "hideIf");
+		handleFor(scope, field, "hidden", "showIf", true);
+		handleFor(scope, field, "readonly", "readonlyIf");
+		handleFor(scope, field, "required", "requiredIf");
+		handleFor(scope, field, "collapse", "collapseIf");
+		handleHilites(scope, scope.field);
+	}
+	
+	function handleForView(scope) {
+		var field = scope.schema;
+		if (!field) return;
+		handleFor(scope, field, "canNew", "canNew");
+		handleFor(scope, field, "canEdit", "canEdit");
+		handleFor(scope, field, "canSave", "canSave");
+		handleFor(scope, field, "canCopy", "canCopy");
+		handleFor(scope, field, "canDelete", "canDelete");
+		handleFor(scope, field, "canAttach", "canAttach");
+	}
+	
 	return function(scope, element, attrs) {
 		scope.$evalAsync(function() {
-			register(scope);
+			if (element.is('[ui-form]')) {
+				return handleForView(scope);
+			}
+			handleForField(scope);
 		});
 	};
 }]);

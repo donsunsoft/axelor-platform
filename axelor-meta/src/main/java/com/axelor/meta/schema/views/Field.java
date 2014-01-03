@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 package com.axelor.meta.schema.views;
 
@@ -43,7 +43,6 @@ import com.axelor.db.mapper.PropertyType;
 import com.axelor.meta.db.MetaSelect;
 import com.axelor.meta.db.MetaSelectItem;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
@@ -106,6 +105,9 @@ public class Field extends SimpleWidget {
 
 	@XmlAttribute
 	private String selection;
+
+	@XmlAttribute(name = "selection-in")
+	private String selectionIn;
 
 	@XmlAttribute
 	private String aggregate;
@@ -258,12 +260,18 @@ public class Field extends SimpleWidget {
 		this.validIf = validIf;
 	}
 
-	@JsonIgnore
 	public String getSelection() {
 		return selection;
 	}
 
-	@JsonProperty("selection")
+	public String getSelectionIn() {
+		return selectionIn;
+	}
+
+	public void setSelectionIn(String selectionIn) {
+		this.selectionIn = selectionIn;
+	}
+
 	public List<Object> getSelectionList() {
 		String selection = getSelection();
 		if (selection == null || "".equals(selection.trim()))

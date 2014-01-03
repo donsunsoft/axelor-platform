@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  *
  * The contents of this file are subject to the Common Public
  * Attribution License Version 1.0 (the “License”); you may not use
@@ -26,7 +26,7 @@
  * the Original Code is Axelor.
  *
  * All portions of the code written by Axelor are
- * Copyright (c) 2012-2013 Axelor. All Rights Reserved.
+ * Copyright (c) 2012-2014 Axelor. All Rights Reserved.
  */
 (function(undefined){
 
@@ -266,7 +266,7 @@ var Formatters = {
 	
 	"button": function(field, value, context, grid) {
 		var elem;
-		var isIcon = field.icon.indexOf('icon-') === 0;
+		var isIcon = field.icon && field.icon.indexOf('icon-') === 0;
 		var css = isIcon ? "slick-icon-button " + field.icon : "slick-img-button";
 		
 		if (field.readonlyIf && axelor.$eval(grid.scope, field.readonlyIf, context)) {
@@ -299,7 +299,7 @@ var Formatters = {
 	
 	"selection": function(field, value) {
 		var cmp = field.type === "integer" ? function(a, b) { return a == b ; } : _.isEqual;
-		var res = _.find(field.selection, function(item){
+		var res = _.find(field.selectionList, function(item){
 			return cmp(item.value, value);
 		}) || {};
 		return res.title;
@@ -362,7 +362,7 @@ _.extend(Factory.prototype, {
 		if (widget === "Progress" || widget === "progress" || widget === "SelectProgress") {
 			type = "progress";
 		}
-		if (_.isArray(field.selection)) {
+		if (_.isArray(field.selectionList)) {
 			type = "selection";
 		}
 
@@ -747,8 +747,8 @@ Grid.prototype._doInit = function(view) {
 				var header = grid.getHeaderRowColumn(col.id),
 					input = $('<input type="text">').data("columnId", col.id).appendTo(header),
 					field = col.descriptor || {};
-				if (_.isArray(field.selection)) {
-					makeFilterCombo(input, field.selection, function(filter){
+				if (_.isArray(field.selectionList)) {
+					makeFilterCombo(input, field.selectionList, function(filter){
 						_.extend(filters, filter);
 					});
 				}
