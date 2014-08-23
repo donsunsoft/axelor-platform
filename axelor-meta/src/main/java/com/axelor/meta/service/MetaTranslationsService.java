@@ -130,7 +130,7 @@ public class MetaTranslationsService {
 			Pattern pattern = Pattern.compile(pat);
 			for(org.reflections.vfs.Vfs.File file : files) {
 				String path = file.toString();
-				Matcher matcher = pattern.matcher(path);
+				Matcher matcher = pattern.matcher(path.replaceAll("\\\\", "/"));
 				if (matcher.find()) {
 					try {
 						process(file.openInputStream(), file.getName(), module);

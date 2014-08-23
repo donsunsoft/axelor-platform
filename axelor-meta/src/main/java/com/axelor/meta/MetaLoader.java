@@ -700,7 +700,7 @@ public class MetaLoader {
 				if (imported.contains(path)) {
 					continue;
 				}
-				Matcher matcher = pattern.matcher(path);
+				Matcher matcher = pattern.matcher(path.replaceAll("\\\\", "/"));
 				if (matcher.find()) {
 					loadFile(file, module);
 				}

@@ -1,0 +1,5 @@
+domain,name,type,title,title_t,help,help_t
+axelor-core,,other,You are not authorized to create this resource.,您没有权限创建这个资源。,,
+axelor-core,,other,You are not authorized to read this resource.,您没有权限读取这个资源。,,
+axelor-core,,other,You are not authorized to remove this resource.,您没有权限删除这个资源。,,
+axelor-core,,other,You are not authorized to update this resource.,您没有权限更新这个资源。,,
