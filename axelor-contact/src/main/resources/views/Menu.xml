@@ -46,6 +46,15 @@
     <domain>self.circle.code = :circle_code</domain>
     <context name="circle_code" expr="business"/>
   </action-view>
+  
+  <menuitem name="menu-contact-address" parent="menu-contact-book" 
+  	title="Address"
+  	action="contact.address"/>
+  	
+  <action-view name="contact.address" title="Address" model="com.axelor.contact.db.Address">
+  	<view type="grid" name="address-grid"/>
+  	<view type="form" name="address-form"/>
+  </action-view>
 
   <menuitem name="menu-contact-config" parent="menu-contact-book"
     title="Configuration" icon="img/wrench.png"/>
