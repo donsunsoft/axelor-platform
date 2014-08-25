@@ -42,7 +42,7 @@ _t.calendar = {
 	closeText: '选择',
 	prevText: '上一页',
 	nextText: '下一页',
-	firstDay: 1
+	firstDay: 7
 };
 
 _t.put({
@@ -89,7 +89,7 @@ _t.put({
 "Offline!": "离线",
 "Password": "密码",
 "Profile": "简介",
-"Question": "问题",
+"Question": "询问",
 "Refresh": "刷新",
 "Remove": "删除",
 "Save": "保存",

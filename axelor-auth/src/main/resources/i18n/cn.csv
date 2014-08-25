@@ -34,14 +34,14 @@ com.axelor.auth.db.Role,groups,field,,组,,
 com.axelor.auth.db.User,code,field,Login,登录名,,
 com.axelor.auth.db.User,name,field,,名称,,
 com.axelor.auth.db.User,password,field,,密码,,
-com.axelor.auth.db.User,blocked,field,Blocked user ?,锁定用户？,Specify whether to block the user for an indeterminate times.,指定是否将用户锁定一段时间。
-com.axelor.auth.db.User,activeFrom,field,Active user from,激活开始时间,Specify whether to allow the user from this specific date.,指定是否允许用户在该时间之后激活。
-com.axelor.auth.db.User,activeTo,field,Active user to,激活结束时间,Specify whether to allow the user until this specific date.,指定是否允许用户在该时间之前激活。
+com.axelor.auth.db.User,blocked,field,Blocked user ?,限定用户？,Specify whether to block the user for an indeterminate times.,指定是否限定用户只在一段时间内有效。
+com.axelor.auth.db.User,activeFrom,field,Active user from,开始时间,Specify whether to allow the user from this specific date.,指定是否允许用户在该时间之后有效。
+com.axelor.auth.db.User,activeTo,field,Active user to,结束时间,Specify whether to allow the user until this specific date.,指定是否允许用户在该时间之前有效。
 com.axelor.auth.db.User,group,field,,组,,
 com.axelor.auth.db.User,roles,field,,角色,,
 "",,select,Visible,可见,,
 "",,select,Hidden,隐藏,,
-"",,select,Collapse,重置,,
+"",,select,Collapse,收缩,,
 com.axelor.auth.db.Group,,button,Show permissions,显示权限,,
 com.axelor.auth.db.Group,,view,Group,组,,
 com.axelor.auth.db.Permission,,view,Permissions,权限,,
@@ -106,9 +106,9 @@ user-form,code,documentation,,,,
 user-form,change,documentation,,,,
 user-form,newPassword,documentation,,,,
 user-form,confirm,documentation,,,,
-user-form,blocked,documentation,,,,永久锁定
-user-form,activeFrom,documentation,,,,激活开始时间
-user-form,activeTo,documentation,,,,激活结束时间
+user-form,blocked,documentation,,,,指定是否限定用户只在一段时间内有效。
+user-form,activeFrom,documentation,,,,有效期开始时间
+user-form,activeTo,documentation,,,,有效期结束时间
 user-form,roles,documentation,,,,
 group-form,group-form,documentation,,,,
 group-form,showPermissions,documentation,,,,
