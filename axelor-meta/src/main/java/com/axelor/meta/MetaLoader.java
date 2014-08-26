@@ -716,7 +716,7 @@ public class MetaLoader {
 			String pat = String.format("(/WEB-INF/lib/%s-)|(%s/WEB-INF/classes/)", module, module);
 			Pattern pattern = Pattern.compile(pat);
 			String path = file.toString();
-			Matcher matcher = pattern.matcher(path);
+			Matcher matcher = pattern.matcher(path.replaceAll("\\\\", "/"));
 			if (matcher.find()) {
 				found = loadSingleFile(file, module, name);
 				if(found) {
