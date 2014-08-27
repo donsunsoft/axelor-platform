@@ -850,7 +850,8 @@ public class MetaLoader {
 		Pattern pattern = Pattern.compile(String.format("(/WEB-INF/lib/%s-)|(%s/WEB-INF/classes/)", name, name));
 
 		for(File file : MetaScanner.findAll("views\\.(.*?)\\.xml")) {
-			Matcher matcher = pattern.matcher(file.toString());
+			String path = file.toString();
+			Matcher matcher = pattern.matcher(path.replaceAll("\\\\", "/"));
 			if (matcher.find()) {
 				loadFile(file, name);
 			}

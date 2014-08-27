@@ -42,6 +42,7 @@ import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
 import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
@@ -64,7 +65,7 @@ import com.google.common.base.Objects.ToStringHelper;
 @Cacheable
 @Table(name = "WORKFLOW_WORKFLOW")
 public class Workflow extends AuditableModel {
-	
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.AUTO)
 	private Long id;
@@ -84,6 +85,7 @@ public class Workflow extends AuditableModel {
 	private Integer maxNodeCounter = 1;
 
 	@ManyToOne(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+	@JoinColumn(name = "`condition`")
 	private MetaAction condition;
 
 	private Integer sequence = 0;
@@ -109,15 +111,17 @@ public class Workflow extends AuditableModel {
 
 	public Workflow() {
 	}
-	
+
 	public Workflow(String name) {
 		this.name = name;
 	}
 
+	@Override
 	public Long getId() {
 		return id;
 	}
 
+	@Override
 	public void setId(Long id) {
 		this.id = id;
 	}
@@ -212,26 +216,26 @@ public class Workflow extends AuditableModel {
 	public void setRef(String ref) {
 		this.ref = ref;
 	}
-	
+
 	@Override
 	public boolean equals(Object obj) {
 		if (obj == null) return false;
 		if (this == obj) return true;
 		if (!(obj instanceof Workflow)) return false;
-		
+
 		Workflow other = (Workflow) obj;
 		if (this.getId() != null && other.getId() != null) {
 			return Objects.equal(this.getId(), other.getId());
 		}
-		
+
 		return false;
 	}
-	
+
 	@Override
 	public int hashCode() {
 		return super.hashCode();
 	}
-	
+
 	@Override
 	public String toString() {
 		ToStringHelper tsh = Objects.toStringHelper(this);
@@ -245,7 +249,7 @@ public class Workflow extends AuditableModel {
 
 		return tsh.omitNullValues().toString();
 	}
-	
+
 	public static Workflow findByName(String name) {
 		return Workflow.all()
 				.filter("self.name = :name")
@@ -255,7 +259,7 @@ public class Workflow extends AuditableModel {
 
 	/**
 	 * Make the entity managed and persistent.
-	 * 
+	 *
 	 * @see EntityManager#persist(Object)
 	 */
 	public Workflow persist() {
@@ -264,7 +268,7 @@ public class Workflow extends AuditableModel {
 
 	/**
 	 * Merge the state of the entity into the current persistence context.
-	 * 
+	 *
 	 * @see EntityManager#merge(Object)
 	 */
 	public Workflow merge() {
@@ -276,43 +280,43 @@ public class Workflow extends AuditableModel {
 	 * <br>
 	 * It uses either {@link #persist()} or {@link #merge()} and calls
 	 * {@link #flush()} to synchronize values with database.
-	 * 
+	 *
 	 * @see #persist(Model)
 	 * @see #merge(Model)
-	 * 
+	 *
 	 */
 	public Workflow save() {
 		return JPA.save(this);
 	}
-	
+
 	/**
 	 * Remove the entity instance.
-	 * 
+	 *
 	 * @see EntityManager#remove(Object)
 	 */
 	public void remove() {
 		JPA.remove(this);
 	}
-	
+
 	/**
 	 * Refresh the state of the instance from the database, overwriting changes
 	 * made to the entity, if any.
-	 * 
+	 *
 	 * @see EntityManager#refresh(Object)
 	 */
 	public void refresh() {
 		JPA.refresh(this);
 	}
-	
+
 	/**
 	 * Synchronize the persistence context to the underlying database.
-	 * 
+	 *
 	 * @see EntityManager#flush()
 	 */
 	public void flush() {
 		JPA.flush();
 	}
-	
+
 	/**
 	 * Find a <code>Workflow</code> by <code>id</code>.
 	 *
@@ -320,7 +324,7 @@ public class Workflow extends AuditableModel {
 	public static Workflow find(Long id) {
 		return JPA.find(Workflow.class, id);
 	}
-	
+
 	/**
 	 * Return a {@link Query} instance for <code>Workflow</code> to filter
 	 * on all the records.
@@ -329,7 +333,7 @@ public class Workflow extends AuditableModel {
 	public static Query<Workflow> all() {
 		return JPA.all(Workflow.class);
 	}
-	
+
 	/**
 	 * A shortcut method to <code>Workflow.all().filter(...)</code>
 	 *
@@ -337,20 +341,20 @@ public class Workflow extends AuditableModel {
 	public static Query<Workflow> filter(String filter, Object... params) {
 		return JPA.all(Workflow.class).filter(filter, params);
 	}
-	
+
 	@SuppressWarnings("rawtypes")
 	public boolean isRunnable(ActionHandler actionHandler){
-		
+
 		if ( this.condition == null ) { return true; }
-		
+
 		actionHandler.getRequest().setAction( this.condition.getName() );
-		for ( Object data : (List) actionHandler.execute().getData()) { 
-			
+		for ( Object data : (List) actionHandler.execute().getData()) {
+
 			if ( ((Map) data).containsKey("errors") && ((Map) data).get("errors") != null && !( (Map) ((Map) data).get("errors") ).isEmpty() ) { return false; }
-			
+
 		}
-		
+
 		return true;
-		
+
 	}
 }

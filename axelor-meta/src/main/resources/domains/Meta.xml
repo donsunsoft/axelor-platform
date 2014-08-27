@@ -152,7 +152,7 @@
     This object store the translation.
     ]]>
     
-  	<string name="key" required="true"/>
+  	<string name="key" required="true" column="`key`"/>
   	<string name="language" required="true"/>
   	<string name="translation" large="true"/>
   	<string name="domain"/>
@@ -190,12 +190,12 @@
   </entity>
 
   <entity name="MetaChartSeries" table="META_CHART_SERIES">
-    <string name="key" required="true"/>
+    <string name="key" required="true" column="`key`"/>
     <string name="groupBy" />
     <string name="title" />
     <string name="type" />
     <string name="side" />
-    <string name="aggregate"/>
+    <string name="aggregate" />
   </entity>
   
   <entity name="MetaChartConfig" table="META_CHART_CONFIG">
