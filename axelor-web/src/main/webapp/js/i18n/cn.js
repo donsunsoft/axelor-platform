@@ -59,6 +59,8 @@ _t.put({
 "Cancel": "取消",
 "Clear": "清除",
 "Close": "关闭",
+"Close Others": "关闭其他",
+"Close All": "关闭所有",
 "Concurrent updates error.": "并发更新错误。",
 "Copy": "复制",
 "Current changes will be lost. Do you really want to proceed?": "当前修改将丢失。您确定要继续操作吗？",
